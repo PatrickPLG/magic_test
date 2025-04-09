@@ -166,92 +166,89 @@
           if (targetEl.classList && targetEl.classList.length > 0) {
              console.log("[MagicTest Debug] Relative Check 3 (:not() logic) starting..."); // Debug Log
             const semanticClassesOnTarget = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
-            const siblings = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName && child !== targetEl);
-             console.log("[MagicTest Debug] Relative Check 3: Target Classes:", semanticClassesOnTarget, "Siblings:", siblings); // Debug Log
+            const parentEl = targetEl.parentElement;
+            if (!parentEl) { // Safety check in case element has no parent
+                console.log("[MagicTest Debug] Relative Check 3: Target element has no parent. Skipping :not() check.");
+            } else {
+                const siblings = Array.from(parentEl.children).filter(child => child.tagName === targetEl.tagName && child !== targetEl);
+                 console.log("[MagicTest Debug] Relative Check 3: Target Classes:", semanticClassesOnTarget, "Siblings:", siblings);
 
-            for (const targetCls of semanticClassesOnTarget) {
-              // --- Add check for valid targetCls ---
-              if (!targetCls || targetCls.trim() === '') continue;
-              // -------------------------------------
-              let baseClassSelector = `.${escapeCSSIdentifier(targetCls)}`;
-              let differentiatingNotClasses = [];
-              console.log(`[MagicTest Debug] Relative Check 3: Checking target class '${targetCls}'`); // Debug Log
-              siblings.forEach(sibling => {
-                // Log check: Does sibling have the target class?
-                const siblingHasTargetCls = sibling.classList.contains(targetCls);
-                console.log(`[MagicTest Debug] Relative Check 3: Sibling:`, sibling, `Has '${targetCls}'? ${siblingHasTargetCls}`);
-                if(siblingHasTargetCls) { // Only compare siblings with the same primary class
-                    console.log(`[MagicTest Debug] Relative Check 3: Comparing with sibling:`, sibling); // Debug Log
-                    Array.from(sibling.classList).forEach(siblingCls => {
-                        // --- Add detailed log before the IF ---
-                        const isSemantic = !BOOTSTRAP_CLASS_REGEX.test(siblingCls);
-                        const targetLacks = !targetEl.classList.contains(siblingCls);
-                        // Log the check details BEFORE the if condition
-                        console.log(`[MagicTest Debug] Relative Check 3: Sibling class '${siblingCls}'. IsSemantic? ${isSemantic}. Target Lacks? ${targetLacks}. Condition Result: ${isSemantic && targetLacks}`);
-                        // ------------------------------------
-                        // Check if the sibling class is semantic AND the target element does NOT have it.
-                        if (isSemantic && targetLacks) {
-                           if (!differentiatingNotClasses.includes(siblingCls)) {
-                               console.log(`[MagicTest Debug] Relative Check 3: Found differentiating class '${siblingCls}'`); // Debug Log
-                               differentiatingNotClasses.push(siblingCls);
-                           }
-                        }
-                    });
-                 }
-              });
-              console.log(`[MagicTest Debug] Relative Check 3: Differentiating classes found for targetCls '${targetCls}':`, differentiatingNotClasses); // Log after checking all siblings
-
-              if (differentiatingNotClasses.length > 0) {
-                const notSelectors = differentiatingNotClasses.map(cls => `:not(.${escapeCSSIdentifier(cls)})`).join('');
-                const candidateSelector = `${targetTagName}${baseClassSelector}${notSelectors}`;
-                console.log(`[MagicTest Debug] Relative Check 3: Trying :not() selector '${candidateSelector}'`); // Debug Log
-                 try {
-                     const matches = ancestorEl.querySelectorAll(candidateSelector);
-                     console.log(`[MagicTest Debug] Relative Check 3 (:not() query) Result: Found ${matches.length} elements.`); // Debug Log
-                     if (matches.length === 1 && matches[0] === targetEl) {
-                       console.log("[MagicTest Debug] Relative Check 3 SUCCESS (:not() worked)!"); // Debug Log
-                       return candidateSelector;
+                for (const targetCls of semanticClassesOnTarget) {
+                  if (!targetCls || targetCls.trim() === '') continue;
+                  let baseClassSelector = `.${escapeCSSIdentifier(targetCls)}`;
+                  let differentiatingNotClasses = [];
+                  console.log(`[MagicTest Debug] Relative Check 3: Checking target class '${targetCls}'`);
+                  siblings.forEach(sibling => {
+                     const siblingHasTargetCls = sibling.classList.contains(targetCls);
+                     console.log(`[MagicTest Debug] Relative Check 3: Sibling:`, sibling, `Has '${targetCls}'? ${siblingHasTargetCls}`);
+                     if(siblingHasTargetCls) {
+                        console.log(`[MagicTest Debug] Relative Check 3: Comparing with sibling that has '${targetCls}':`, sibling);
+                        Array.from(sibling.classList).forEach(siblingCls => {
+                            const isSemantic = !BOOTSTRAP_CLASS_REGEX.test(siblingCls);
+                            const targetLacks = !targetEl.classList.contains(siblingCls);
+                            console.log(`[MagicTest Debug] Relative Check 3: Sibling class '${siblingCls}'. IsSemantic? ${isSemantic}. Target Lacks? ${targetLacks}. Condition Result: ${isSemantic && targetLacks}`);
+                            if (isSemantic && targetLacks) {
+                               if (!differentiatingNotClasses.includes(siblingCls)) {
+                                   console.log(`[MagicTest Debug] Relative Check 3: Found differentiating class '${siblingCls}'`);
+                                   differentiatingNotClasses.push(siblingCls);
+                               }
+                            }
+                        });
                      }
-                 } catch(e) { console.warn("[MagicTest Debug] Relative Check 3 (:not() query) Error:", e); }
-              }
+                  });
+                  console.log(`[MagicTest Debug] Relative Check 3: Differentiating classes found for targetCls '${targetCls}':`, differentiatingNotClasses);
 
-              const simpleTagAndClassSelector = `${targetTagName}${baseClassSelector}`;
-              console.log(`[MagicTest Debug] Relative Check 3: Trying simple tag+class '${simpleTagAndClassSelector}'`); // Debug Log
-               try {
-                 const simpleMatches = ancestorEl.querySelectorAll(simpleTagAndClassSelector);
-                 console.log(`[MagicTest Debug] Relative Check 3 (simple tag+class query) Result: Found ${simpleMatches.length} elements.`); // Debug Log
-                 if (simpleMatches.length === 1 && simpleMatches[0] === targetEl) {
-                    console.log("[MagicTest Debug] Relative Check 3 SUCCESS (simple tag+class worked)!"); // Debug Log
-                    return simpleTagAndClassSelector;
-                 }
-               } catch(e) { console.warn("[MagicTest Debug] Relative Check 3 (simple tag+class query) Error:", e); }
-            }
-          }
+                  if (differentiatingNotClasses.length > 0) {
+                    const notSelectors = differentiatingNotClasses.map(cls => `:not(.${escapeCSSIdentifier(cls)})`).join('');
+                    const candidateSelector = `${targetTagName}${baseClassSelector}${notSelectors}`;
+                    console.log(`[MagicTest Debug] Relative Check 3: Trying :not() selector '${candidateSelector}'`);
+                     try {
+                         const matches = ancestorEl.querySelectorAll(candidateSelector);
+                         console.log(`[MagicTest Debug] Relative Check 3 (:not() query) Result: Found ${matches.length} elements.`);
+                         if (matches.length === 1 && matches[0] === targetEl) {
+                           console.log("[MagicTest Debug] Relative Check 3 SUCCESS (:not() worked)!");
+                           return candidateSelector;
+                         }
+                     } catch(e) { console.warn("[MagicTest Debug] Relative Check 3 (:not() query) Error:", e); }
+                  }
+
+                  const simpleTagAndClassSelector = `${targetTagName}${baseClassSelector}`;
+                  console.log(`[MagicTest Debug] Relative Check 3: Trying simple tag+class '${simpleTagAndClassSelector}'`);
+                   try {
+                     const simpleMatches = ancestorEl.querySelectorAll(simpleTagAndClassSelector);
+                     console.log(`[MagicTest Debug] Relative Check 3 (simple tag+class query) Result: Found ${simpleMatches.length} elements.`);
+                     if (simpleMatches.length === 1 && simpleMatches[0] === targetEl) {
+                        console.log("[MagicTest Debug] Relative Check 3 SUCCESS (simple tag+class worked)!");
+                        return simpleTagAndClassSelector;
+                     }
+                   } catch(e) { console.warn("[MagicTest Debug] Relative Check 3 (simple tag+class query) Error:", e); }
+                } // End loop through targetCls
+            } // End else block for parentEl check
+          } // End check for targetEl.classList
 
           // 4. Positional Fallback: :nth-of-type
           console.log("[MagicTest Debug] Relative Check 4 (:nth-of-type) starting..."); // Debug Log
-          // --- START: Replace :nth-of-type index calculation ---
-          // let index = -1;
-          // const siblingsOfType = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName);
-          // for(let i = 0; i < siblingsOfType.length; i++) { if (siblingsOfType[i] === targetEl) { index = i + 1; break; } }
-          let index = 0; // Use 0 to indicate not found, becomes 1-based index
+          let index = 0;
           let count = 0;
-          for (const child of ancestorEl.children) {
-              if (child.tagName === targetEl.tagName) {
-                  count++; // Increment counter for elements of this type
-                  // --- Add detailed log for element comparison ---
-                  const isMatch = (child === targetEl);
-                  console.log(`[MagicTest Debug] Relative Check 4: Comparing child ${count} (tag ${child.tagName}):`, child, `with targetEl:`, targetEl, `Are they the same object? ${isMatch}`);
-                  // -------------------------------------------
-                  if (isMatch) {
-                      index = count; // Found it, store the 1-based index
-                      console.log(`[MagicTest Debug] Relative Check 4: Found target element at 1-based index ${index}`); // Log success
-                      break;
+          const parentElementForNth = targetEl.parentElement;
+          if (parentElementForNth) { // Ensure parent exists
+              // Iterate through the children of the *immediate parent*
+              for (const child of parentElementForNth.children) {
+                  if (child.tagName === targetEl.tagName) {
+                      count++;
+                      const isMatch = (child === targetEl);
+                      console.log(`[MagicTest Debug] Relative Check 4: Comparing child ${count} (tag ${child.tagName}):`, child, `with targetEl:`, targetEl, `Are they the same object? ${isMatch}`);
+                      if (isMatch) {
+                          index = count;
+                          console.log(`[MagicTest Debug] Relative Check 4: Found target element at 1-based index ${index}`);
+                          break;
+                      }
                   }
               }
+          } else {
+              console.log("[MagicTest Debug] Relative Check 4: Target element has no parent. Cannot calculate :nth-of-type index.");
           }
-          // --- END: Replace :nth-of-type index calculation ---
-          console.log(`[MagicTest Debug] Relative Check 4: Calculated index ${index}`); // Debug Log
+          console.log(`[MagicTest Debug] Relative Check 4: Calculated index ${index}`);
           if (index > 0) { // Check if index was found (is > 0)
               const candidateSelector = `${targetTagName}:nth-of-type(${index})`;
               console.log(`[MagicTest Debug] Relative Check 4: Trying '${candidateSelector}'`); // Debug Log
