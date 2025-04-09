@@ -1,5 +1,96 @@
 <script text="text/javascript">
 
+  // --- START: New Selector Logic ---
+  const BOOTSTRAP_CLASS_REGEX = /^(m|p|d-|g-|col|align|justify|text|bg|border|flex|order|fs-|fw-|lh-|w-|h-|position-|top-|bottom-|start-|end-|translate-|rounded|shadow|overflow-|float-|object-|opacity-|visibility-|z-)/;
+
+  function isUnique(selector) {
+    if (!selector) return false;
+    try {
+      return document.querySelectorAll(selector).length === 1;
+    } catch (e) {
+      // Handle invalid selectors potentially generated during class combinations
+      // console.warn("MagicTest: Invalid selector generated during check:", selector, e);
+      return false;
+    }
+  }
+
+  function escapeCSSIdentifier(ident) {
+    // Basic escaping for CSS identifiers (more comprehensive escaping might be needed)
+    // See: https://developer.mozilla.org/en-US/docs/Web/API/CSS/escape
+    if (window.CSS && CSS.escape) {
+      return CSS.escape(ident);
+    } else {
+      // Basic fallback for older browsers or environments without CSS.escape
+      return ident.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+    }
+  }
+
+  function findBestSelector(element) {
+    if (!element) return null;
+
+    // 1. ID
+    if (element.id) {
+      const idSelector = `#${escapeCSSIdentifier(element.id)}`;
+      if (isUnique(idSelector)) return idSelector;
+    }
+
+    // 2. Name (for form elements)
+    const tagName = element.tagName.toUpperCase();
+    if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tagName) && element.name) {
+      const nameSelector = `${tagName.toLowerCase()}[name="${element.name}"]`;
+      if (isUnique(nameSelector)) return nameSelector;
+    }
+
+    // 3. Associated Label Text (for form elements)
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tagName) && element.id) {
+      const label = document.querySelector(`label[for="${escapeCSSIdentifier(element.id)}"]`);
+      if (label && label.textContent.trim()) {
+        // This requires Capybara's fill_in/select/etc. logic, return null here
+        // Let the specific handlers in click/keypress functions use the label text directly
+      }
+    }
+
+    // 4. Button/Link/Submit Text (Handled directly in clickFunction for now)
+    // Can be added here if needed for other contexts
+
+    // 5. Semantic Classes (filtering utility classes)
+    if (element.classList && element.classList.length > 0) {
+      const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+      if (semanticClasses.length > 0) {
+        const classSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
+        if (isUnique(classSelector)) return classSelector;
+
+        // Optional: Try combinations if the full set isn't unique (adds complexity)
+      }
+    }
+
+    // 6. Robust CSS Fallback (Tag + Type/Href for some elements)
+    let fallbackSelector = tagName.toLowerCase();
+    if (tagName === 'INPUT' && element.type) {
+      fallbackSelector += `[type="${element.type}"]`;
+    } else if (tagName === 'A' && element.href) {
+      // Href can be too long/complex, maybe avoid generally?
+      // fallbackSelector += `[href="${element.getAttribute('href')}"]`; // Use getAttribute for literal value
+    }
+    // Add other specific attributes if needed
+
+    if (isUnique(fallbackSelector)) return fallbackSelector;
+
+    // --- Last Resort ---
+    // Maybe try tag + a single filtered class?
+    if (element.classList && element.classList.length > 0) {
+       const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+       for (const cls of semanticClasses) {
+         const singleClassSelector = `${tagName.toLowerCase()}.${escapeCSSIdentifier(cls)}`;
+         if (isUnique(singleClassSelector)) return singleClassSelector;
+       }
+    }
+
+    // If still no unique selector, return null - indicating we couldn't find a good one.
+    return null;
+  }
+  // --- END: New Selector Logic ---
+
   ready(function() {
     console.log("🪄 Magic Test activated in the browser!")
     initializeStorage();
@@ -66,28 +157,68 @@
       if (!target) {
         // Attempt to find a target using aria-label or title if standard text/value fails
         target = element.getAttribute('aria-label') || element.getAttribute('title');
-        if (!target) return; // Still no target, ignore click
+        if (!target) {
+          // --- START: Use findBestSelector if text/aria/title fail ---
+           var selector = findBestSelector(element);
+           if (selector) {
+             var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
+             action = `find('${escapedSelector}')`;
+             target = `.click`;
+             options = "";
+           } else {
+             console.warn("MagicTest: Could not find suitable selector for button/link:", element);
+             return; // Still no target, ignore click
+           }
+          // --- END: Use findBestSelector ---
+        } else {
+           target = "\\'" + target.trim().replace(/'/g, "\\\\'") + "\\'";
+        }
+      } else {
+         target = "\\'" + target.trim().replace(/'/g, "\\\\'") + "\\'";
       }
-      target = "\'" + target.trim().replace("'", "\\\'") + "\'";
     } else if (tagName == "INPUT") {
       let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local'];
       if (ignoreType.includes(element.type)) {
         return; // Ignore clicks that are just focusing text-like inputs
       }
-      var path = getPathTo(element);
-      action = `find(:xpath, '${path}').click`;
-      target = ""; // No target needed for xpath click
-      options = "";
-    } else {
-      // Maybe it's a label or some other clickable element? Try xpath.
-      var path = getPathTo(element);
-      if (path) {
-         action = `find(:xpath, '${path}').click`;
-         target = "";
-         options = "";
+      // --- START: Use findBestSelector instead of XPath ---
+      // var path = getPathTo(element);
+      // action = `find(:xpath, '${path}').click`;
+      // target = ""; // No target needed for xpath click
+      // options = "";
+      var selector = findBestSelector(element);
+      if (selector) {
+        var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
+        action = `find('${escapedSelector}')`;
+        target = `.click`;
+        options = "";
       } else {
+         console.warn("MagicTest: Could not find suitable selector for input:", element);
          return; // Cannot determine a reliable way to record this click
       }
+      // --- END: Use findBestSelector instead of XPath ---
+    } else {
+      // Maybe it's a label or some other clickable element? Try xpath.
+      // --- START: Use findBestSelector instead of XPath ---
+      // var path = getPathTo(element);
+      // if (path) {
+      //    action = `find(:xpath, '${path}').click`;
+      //    target = "";
+      //    options = "";
+      // } else {
+      //    return; // Cannot determine a reliable way to record this click
+      // }
+      var selector = findBestSelector(element);
+      if (selector) {
+        var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
+        action = `find('${escapedSelector}')`;
+        target = `.click`;
+        options = "";
+      } else {
+         console.warn("MagicTest: Could not find suitable selector for element:", element);
+         return; // Cannot determine a reliable way to record this click
+      }
+      // --- END: Use findBestSelector instead of XPath ---
     }
     var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     testingOutput.push({action: action, target: target, options: options });
@@ -162,8 +293,23 @@
     var charStr = capybaraFromCharCode(charCode);
     var letter = evt.key == "'" ? "\\\'" : evt.key;
     var tagName = evt.target.tagName.toLowerCase();
-    var action = finderForElement(evt.target) + "." // `find('${tagName}').`;
-    var target = ""
+
+    // --- START: Use findBestSelector instead of finderForElement ---
+    // var action = finderForElement(evt.target) + "."; // `find('${tagName}').`;
+    var selector = findBestSelector(evt.target);
+    var action;
+    if (selector) {
+       var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
+       action = `find('${escapedSelector}')`;
+    } else {
+       // Fallback if findBestSelector fails (e.g., use simple tag name, though potentially fragile)
+       console.warn("MagicTest: Could not find suitable selector for keydown target, falling back to tag:", evt.target);
+       action = `find('${tagName}')`; // Potentially fragile fallback
+       // Alternatively: return; // Skip recording if selector fails
+    }
+    // --- END: Use findBestSelector ---
+
+    var target = "";
     if (charStr) {
       target = `send_keys(${charStr})`;
     } else {
