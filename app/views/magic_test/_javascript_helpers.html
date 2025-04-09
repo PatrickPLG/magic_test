@@ -177,13 +177,17 @@
               let differentiatingNotClasses = [];
               console.log(`[MagicTest Debug] Relative Check 3: Checking target class '${targetCls}'`); // Debug Log
               siblings.forEach(sibling => {
-                 if(sibling.classList.contains(targetCls)) {
+                // Log check: Does sibling have the target class?
+                const siblingHasTargetCls = sibling.classList.contains(targetCls);
+                console.log(`[MagicTest Debug] Relative Check 3: Sibling:`, sibling, `Has '${targetCls}'? ${siblingHasTargetCls}`);
+                if(siblingHasTargetCls) { // Only compare siblings with the same primary class
                     console.log(`[MagicTest Debug] Relative Check 3: Comparing with sibling:`, sibling); // Debug Log
                     Array.from(sibling.classList).forEach(siblingCls => {
                         // --- Add detailed log before the IF ---
                         const isSemantic = !BOOTSTRAP_CLASS_REGEX.test(siblingCls);
                         const targetLacks = !targetEl.classList.contains(siblingCls);
-                        console.log(`[MagicTest Debug] Relative Check 3: Sibling class '${siblingCls}'. IsSemantic? ${isSemantic}. Target Lacks? ${targetLacks}`);
+                        // Log the check details BEFORE the if condition
+                        console.log(`[MagicTest Debug] Relative Check 3: Sibling class '${siblingCls}'. IsSemantic? ${isSemantic}. Target Lacks? ${targetLacks}. Condition Result: ${isSemantic && targetLacks}`);
                         // ------------------------------------
                         // Check if the sibling class is semantic AND the target element does NOT have it.
                         if (isSemantic && targetLacks) {
@@ -235,7 +239,11 @@
           for (const child of ancestorEl.children) {
               if (child.tagName === targetEl.tagName) {
                   count++; // Increment counter for elements of this type
-                  if (child === targetEl) {
+                  // --- Add detailed log for element comparison ---
+                  const isMatch = (child === targetEl);
+                  console.log(`[MagicTest Debug] Relative Check 4: Comparing child ${count} (tag ${child.tagName}):`, child, `with targetEl:`, targetEl, `Are they the same object? ${isMatch}`);
+                  // -------------------------------------------
+                  if (isMatch) {
                       index = count; // Found it, store the 1-based index
                       console.log(`[MagicTest Debug] Relative Check 4: Found target element at 1-based index ${index}`); // Log success
                       break;
