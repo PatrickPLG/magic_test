@@ -2,6 +2,7 @@
 
   // --- START: New Selector Logic ---
   const BOOTSTRAP_CLASS_REGEX = /^(m|p|d-|g-|col|align|justify|text|bg|border|flex|order|fs-|fw-|lh-|w-|h-|position-|top-|bottom-|start-|end-|translate-|rounded|shadow|overflow-|float-|object-|opacity-|visibility-|z-)/;
+  const MAX_ANCESTOR_SEARCH_DEPTH = 5; // Limit how far up we look for a scope
 
   function isUnique(selector) {
     if (!selector) return false;
@@ -25,69 +26,139 @@
     }
   }
 
+  // Tries to find the most robust and semantic CSS selector for a given element
+  // Returns an object: { type: 'global'| 'scoped' | 'none', selector?, ancestorSelector?, targetSelector? }
   function findBestSelector(element) {
-    if (!element) return null;
+    if (!element) return { type: 'none' };
 
-    // 1. ID
-    if (element.id) {
-      const idSelector = `#${escapeCSSIdentifier(element.id)}`;
-      if (isUnique(idSelector)) return idSelector;
-    }
-
-    // 2. Name (for form elements)
-    const tagName = element.tagName.toUpperCase();
-    if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tagName) && element.name) {
-      const nameSelector = `${tagName.toLowerCase()}[name="${element.name}"]`;
-      if (isUnique(nameSelector)) return nameSelector;
-    }
-
-    // 3. Associated Label Text (for form elements)
-    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(tagName) && element.id) {
-      const label = document.querySelector(`label[for="${escapeCSSIdentifier(element.id)}"]`);
-      if (label && label.textContent.trim()) {
-        // This requires Capybara's fill_in/select/etc. logic, return null here
-        // Let the specific handlers in click/keypress functions use the label text directly
+    // --- Try finding a GLOBALLY unique selector first ---
+    function findGlobalSelector(el) {
+      // 1. ID
+      if (el.id) {
+        const idSelector = `#${escapeCSSIdentifier(el.id)}`;
+        if (isUnique(idSelector)) return idSelector;
       }
-    }
 
-    // 4. Button/Link/Submit Text (Handled directly in clickFunction for now)
-    // Can be added here if needed for other contexts
-
-    // 5. Semantic Classes (filtering utility classes)
-    if (element.classList && element.classList.length > 0) {
-      const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
-      if (semanticClasses.length > 0) {
-        const classSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
-        if (isUnique(classSelector)) return classSelector;
-
-        // Optional: Try combinations if the full set isn't unique (adds complexity)
+      // 2. Name (for form elements)
+      const tagName = el.tagName.toUpperCase();
+      if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tagName) && el.name) {
+        const nameSelector = `${tagName.toLowerCase()}[name="${el.name}"]`;
+        if (isUnique(nameSelector)) return nameSelector;
       }
+
+      // 3. & 4. Label/Button Text (Handled directly in event handlers for now)
+
+      // 5. Semantic Classes (filtering utility classes)
+      if (el.classList && el.classList.length > 0) {
+        const semanticClasses = Array.from(el.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+        if (semanticClasses.length > 0) {
+          const classSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
+          if (isUnique(classSelector)) return classSelector;
+        }
+      }
+
+      // 6. Robust CSS Fallback (Tag + Type/Href etc.)
+      let fallbackSelector = tagName.toLowerCase();
+      if (tagName === 'INPUT' && el.type) {
+        fallbackSelector += `[type="${el.type}"]`;
+      } // Add other attributes if needed
+      if (isUnique(fallbackSelector)) return fallbackSelector;
+
+      // 7. Last Resort: Tag + Single Semantic Class
+      if (el.classList && el.classList.length > 0) {
+         const semanticClasses = Array.from(el.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+         for (const cls of semanticClasses) {
+           const singleClassSelector = `${tagName.toLowerCase()}.${escapeCSSIdentifier(cls)}`;
+           if (isUnique(singleClassSelector)) return singleClassSelector;
+         }
+      }
+      return null; // No globally unique selector found for this element
     }
 
-    // 6. Robust CSS Fallback (Tag + Type/Href for some elements)
-    let fallbackSelector = tagName.toLowerCase();
-    if (tagName === 'INPUT' && element.type) {
-      fallbackSelector += `[type="${element.type}"]`;
-    } else if (tagName === 'A' && element.href) {
-      // Href can be too long/complex, maybe avoid generally?
-      // fallbackSelector += `[href="${element.getAttribute('href')}"]`; // Use getAttribute for literal value
-    }
-    // Add other specific attributes if needed
-
-    if (isUnique(fallbackSelector)) return fallbackSelector;
-
-    // --- Last Resort ---
-    // Maybe try tag + a single filtered class?
-    if (element.classList && element.classList.length > 0) {
-       const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
-       for (const cls of semanticClasses) {
-         const singleClassSelector = `${tagName.toLowerCase()}.${escapeCSSIdentifier(cls)}`;
-         if (isUnique(singleClassSelector)) return singleClassSelector;
-       }
+    let globalSelector = findGlobalSelector(element);
+    if (globalSelector) {
+      return { type: 'global', selector: globalSelector };
     }
 
-    // If still no unique selector, return null - indicating we couldn't find a good one.
-    return null;
+    // --- If no global selector, try finding a SCOPED context ---
+    let currentElement = element;
+    for (let depth = 0; depth < MAX_ANCESTOR_SEARCH_DEPTH; depth++) {
+      let ancestorElement = currentElement.parentElement;
+      if (!ancestorElement || ancestorElement.tagName === 'BODY' || ancestorElement.tagName === 'HTML') {
+        break; // Stop if we reach the top or run out of parents
+      }
+
+      let ancestorSelector = findGlobalSelector(ancestorElement); // Can the ancestor be uniquely identified?
+      if (ancestorSelector) {
+        // Found a unique ancestor. Now try to find the original target *relative* to it.
+        // Use simple selectors for the relative target (e.g., classes, tag+attribute)
+        const tagName = element.tagName.toUpperCase();
+        let relativeSelector = null;
+
+        // Try simple tag name first (if unique within ancestor)
+        if (ancestorElement.querySelectorAll(tagName.toLowerCase()).length === 1) {
+           // Ensure it's our specific element
+           if (ancestorElement.querySelector(tagName.toLowerCase()) === element) {
+              relativeSelector = tagName.toLowerCase();
+           }
+        }
+
+        // Try semantic classes (relative uniqueness)
+        if (!relativeSelector && element.classList && element.classList.length > 0) {
+          const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+          if (semanticClasses.length > 0) {
+            const scopedClassSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
+            try {
+              const matches = ancestorElement.querySelectorAll(scopedClassSelector);
+              if (matches.length === 1 && matches[0] === element) {
+                relativeSelector = scopedClassSelector;
+              }
+            } catch(e) { /* ignore invalid selectors */ }
+          }
+        }
+
+        // Try tag + type (relative uniqueness)
+        if (!relativeSelector && tagName === 'INPUT' && element.type) {
+            const scopedTagTypeSelector = `${tagName.toLowerCase()}[type="${element.type}"]`;
+            try {
+                 const matches = ancestorElement.querySelectorAll(scopedTagTypeSelector);
+                 if (matches.length === 1 && matches[0] === element) {
+                     relativeSelector = scopedTagTypeSelector;
+                 }
+            } catch(e) { /* ignore invalid selectors */ }
+        }
+
+        // Try tag + single semantic class (relative uniqueness)
+        if (!relativeSelector && element.classList && element.classList.length > 0) {
+           const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+           for (const cls of semanticClasses) {
+               const scopedSingleClassSelector = `${tagName.toLowerCase()}.${escapeCSSIdentifier(cls)}`;
+               try {
+                   const matches = ancestorElement.querySelectorAll(scopedSingleClassSelector);
+                   if (matches.length === 1 && matches[0] === element) {
+                       relativeSelector = scopedSingleClassSelector;
+                       break; // Found one
+                   }
+               } catch(e) { /* ignore invalid selectors */ }
+           }
+        }
+
+
+        // If we found a unique relative selector for the target within this unique ancestor
+        if (relativeSelector) {
+          return {
+            type: 'scoped',
+            ancestorSelector: ancestorSelector,
+            targetSelector: relativeSelector
+          };
+        }
+      }
+      // If ancestor wasn't unique, or target wasn't unique within it, move up
+      currentElement = ancestorElement;
+    }
+
+    // If loop finishes without finding a scoped context
+    return { type: 'none' };
   }
   // --- END: New Selector Logic ---
 
@@ -151,94 +222,101 @@
     // --- Chosen.js Handling --- END
 
     // Default handling for non-chosen elements
+    let recordedData = null; // Object to hold the data to record
+
+    // Priority 1: Buttons, Links, Submit Inputs (prefer text-based finders)
     if (tagName == "BUTTON" || tagName == "A" || (tagName == "INPUT" && element.type == 'submit')) {
-      action = "click_on";
-      // Prefer text content, value, aria-label, or title for click_on
-      target = element.textContent || element.innerText || element.value; // Order matters
-      if (!target || target.trim().length === 0) {
-        target = element.getAttribute('aria-label') || element.getAttribute('title');
+      let targetText = element.textContent || element.innerText || element.value;
+      if (!targetText || targetText.trim().length === 0) {
+        targetText = element.getAttribute('aria-label') || element.getAttribute('title');
       }
 
-      if (target && target.trim().length > 0) {
+      if (targetText && targetText.trim().length > 0) {
         // Found usable text/label -> Use click_on 'Target'
-        target = "\'" + target.trim().replace(/\'/g, "\\'") + "\'"; // Escape for Ruby
-        options = ""; // No options needed for click_on
+        recordedData = {
+          action: "click_on",
+          target: "\'" + targetText.trim().replace(/\'/g, "\\\'") + "\'", // Escape for Ruby
+          options: ""
+        };
       } else {
-        // If no text/label found, fall back to CSS selector find
-        var selector = findBestSelector(element);
-        if (selector) {
-          var escapedSelector = selector.replace(/\'/g, "\\\'"); // Escape for Ruby string
-          // --- START FIX: Correct recording format ---
-          // action = `find('${escapedSelector}')`;
-          // target = `.click`; // Append .click on the Ruby side
-          // options = "";
-          action = "find";
-          // --- START FIX: Correct Quoting ---
-          // target = `'''${escapedSelector}'''`; // Embed selector in single quotes
-          target = `'${escapedSelector}'`; // Embed selector in single quotes
-          // --- END FIX: Correct Quoting ---
-          options = ".click";
-          // --- END FIX ---
+        // If no text/label found, fall back to selector find
+        let selectorResult = findBestSelector(element);
+        if (selectorResult.type === 'global') {
+            recordedData = {
+                action: "find",
+                target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector in quotes
+                options: ".click"
+            };
+        } else if (selectorResult.type === 'scoped') {
+            recordedData = {
+                scopeType: 'within',
+                scopeSelector: `'${selectorResult.ancestorSelector.replace(/\'/g, "\\\'")}'`, // Escaped ancestor selector
+                action: "find",
+                target: `'${selectorResult.targetSelector.replace(/\'/g, "\\\'")}'`, // Escaped relative target selector
+                options: ".click"
+            };
         } else {
-          console.warn("MagicTest: Could not find suitable text or selector for button/link:", element);
-          return; // Cannot reliably identify, ignore click
+            console.warn("MagicTest: Could not find suitable text or selector for button/link:", element);
+            // recordedData remains null
         }
       }
     }
     // Priority 2: Other Input Types (Clicks on checkbox, radio etc.)
     else if (tagName == "INPUT") {
-      // Ignore clicks that just focus text-like inputs (handled by keypress/fill_in)
-      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local', 'color', 'range', 'file']; // Expanded ignore list
+      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local', 'color', 'range', 'file'];
       if (ignoreType.includes(element.type)) {
-        return;
+        return; // Ignore clicks that just focus text-like inputs
       }
-      // For other input types (checkbox, radio, etc.), use findBestSelector
-      var selector = findBestSelector(element);
-      if (selector) {
-        var escapedSelector = selector.replace(/\'/g, "\\\'"); // Escape for Ruby string
-        // --- START FIX: Correct recording format ---
-        // action = `find('${escapedSelector}')`;
-        // target = `.click`; // Append .click on the Ruby side
-        // options = "";
-        action = "find";
-        // --- START FIX: Correct Quoting ---
-        // target = `'''${escapedSelector}'''`; // Embed selector in single quotes
-        target = `'${escapedSelector}'`; // Embed selector in single quotes
-        // --- END FIX: Correct Quoting ---
-        options = ".click";
-        // --- END FIX ---
+      // For other input types, use findBestSelector
+      let selectorResult = findBestSelector(element);
+      if (selectorResult.type === 'global') {
+          recordedData = {
+              action: "find",
+              target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector in quotes
+              options: ".click"
+          };
+      } else if (selectorResult.type === 'scoped') {
+          recordedData = {
+              scopeType: 'within',
+              scopeSelector: `'${selectorResult.ancestorSelector.replace(/\'/g, "\\\'")}'`, // Escaped ancestor selector
+              action: "find",
+              target: `'${selectorResult.targetSelector.replace(/\'/g, "\\\'")}'`, // Escaped relative target selector
+              options: ".click"
+          };
       } else {
          console.warn("MagicTest: Could not find suitable selector for input:", element);
-         return; // Cannot determine a reliable way to record this click
+         // recordedData remains null
       }
     }
     // Priority 3: General Fallback for other clickable elements (divs, spans, svgs etc.)
     else {
-      var selector = findBestSelector(element);
-      if (selector) {
-        var escapedSelector = selector.replace(/\'/g, "\\\'"); // Escape for Ruby string
-        // --- START FIX: Correct recording format ---
-        // action = `find('${escapedSelector}')`;
-        // target = `.click`; // Append .click on the Ruby side
-        // options = "";
-        action = "find";
-        // --- START FIX: Correct Quoting ---
-        // target = `'''${escapedSelector}'''`; // Embed selector in single quotes
-        target = `'${escapedSelector}'`; // Embed selector in single quotes
-        // --- END FIX: Correct Quoting ---
-        options = ".click";
-        // --- END FIX ---
+      let selectorResult = findBestSelector(element);
+      if (selectorResult.type === 'global') {
+          recordedData = {
+              action: "find",
+              target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector in quotes
+              options: ".click"
+          };
+      } else if (selectorResult.type === 'scoped') {
+          recordedData = {
+              scopeType: 'within',
+              scopeSelector: `'${selectorResult.ancestorSelector.replace(/\'/g, "\\\'")}'`, // Escaped ancestor selector
+              action: "find",
+              target: `'${selectorResult.targetSelector.replace(/\'/g, "\\\'")}'`, // Escaped relative target selector
+              options: ".click"
+          };
       } else {
-         // If even findBestSelector fails, log it and ignore the click
          console.warn("MagicTest: Could not find suitable selector for generic element:", element);
-         return; // Cannot determine a reliable way to record this click
+         // recordedData remains null
       }
     }
 
-    // Record the determined action
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-    testingOutput.push({action: action, target: target, options: options });
-    sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+    // Record the determined action if found
+    if (recordedData) {
+        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+        testingOutput.push(recordedData);
+        sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+    }
   };
 
   function keypressFunction(evt) {
@@ -310,48 +388,74 @@
     var letter = evt.key == "'" ? "\\\'" : evt.key;
     var tagName = evt.target.tagName.toLowerCase();
 
-    // --- START: Use findBestSelector instead of finderForElement ---
-    // var action = finderForElement(evt.target) + "."; // `find('${tagName}').`;
-    var selector = findBestSelector(evt.target);
-    var action;
-    if (selector) {
-       var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
-       action = `find('${escapedSelector}')`;
-    } else {
-       // Fallback if findBestSelector fails (e.g., use simple tag name, though potentially fragile)
-       console.warn("MagicTest: Could not find suitable selector for keydown target, falling back to tag:", evt.target);
-       action = `find('${tagName}')`; // Potentially fragile fallback
-       // Alternatively: return; // Skip recording if selector fails
-    }
-    // --- END: Use findBestSelector ---
+    // Use findBestSelector to identify the target element
+    let selectorResult = findBestSelector(evt.target);
+    let recordedData = null;
 
-    var target = "";
-    if (charStr) {
-      target = `send_keys(${charStr})`;
+    // Format the key: symbol (e.g., :enter) or escaped string ('a', '\\\'')
+    var targetKey = letter.startsWith(':') ? letter : `'\'${letter.replace(/\'/g, "\\\'")}\'`;
+    var sendKeysOptions = `.send_keys(${targetKey})`;
+
+    if (selectorResult.type === 'global') {
+        recordedData = {
+            action: 'find',
+            target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector
+            options: sendKeysOptions
+        };
+    } else if (selectorResult.type === 'scoped') {
+        recordedData = {
+            scopeType: 'within',
+            scopeSelector: `'${selectorResult.ancestorSelector.replace(/\'/g, "\\\'")}'`, // Escaped ancestor selector
+            action: 'find',
+            target: `'${selectorResult.targetSelector.replace(/\'/g, "\\\'")}'`, // Escaped relative target selector
+            options: sendKeysOptions
+        };
     } else {
-      target = `send_keys('${letter}')`;
+        // Fallback if findBestSelector fails (maybe log? or try simple tag?)
+        console.warn("MagicTest: Could not find suitable selector for keydown target:", evt.target);
+        // Could potentially record based on tag name as a last resort, but might be fragile:
+        // recordedData = { action: 'find', target: `'${evt.target.tagName.toLowerCase()}'`, options: sendKeysOptions };
+        // For now, ignore if no good selector found
     }
-    var options = "";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-    var lastAction = testingOutput[testingOutput.length - 1];
-    // If the last key pressed was enter, always start a new action (otherwise with trix mentions, it happens too fast and we don't actually select the mentioned user correctly.)
-    if (lastAction && lastAction.target.substr(lastAction.target.length - 7 , 6) == ":enter") {
-      lastAction = null;
-    }
-    if (lastAction && lastAction.action == action && lastAction.target.substr(0,9) == 'send_keys') {
-      if (charStr) {
-        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', ' + charStr + ')'
-      } else {
-        if (lastAction.target.substr(lastAction.target.length - 2, 1) == "'") {
-          lastAction.target = lastAction.target.substr(0, lastAction.target.length - 2) + letter + '\'' + ')'
-        } else {
-          lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', \'' + letter + '\'' + ')'
+
+
+    if (recordedData) {
+        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+        var lastAction = testingOutput[testingOutput.length - 1];
+
+        // --- START: Aggregation Logic Refinement (Needs careful check) ---
+        // Check if last action can be aggregated. Criteria:
+        // 1. Current action is character key (not symbol like :enter)
+        // 2. Last action exists
+        // 3. Last action was also a send_keys (options start with .send_keys)
+        // 4. Scope matches (both global or both within same ancestorSelector)
+        // 5. Target element matches (same target selector)
+
+        let canAggregate = false;
+        if (!letter.startsWith(':') && lastAction && lastAction.options && lastAction.options.startsWith('.send_keys')) {
+            const sameScope = (lastAction.scopeType || 'global') === (recordedData.scopeType || 'global') &&
+                              lastAction.scopeSelector === recordedData.scopeSelector;
+            const sameTarget = lastAction.action === recordedData.action && // both 'find'
+                               lastAction.target === recordedData.target;
+
+            if (sameScope && sameTarget) {
+                canAggregate = true;
+            }
         }
-      }
-    } else {
-      testingOutput.push({action: action, target: target, options: options});
+
+        if (canAggregate) {
+             // Extract existing keys and append the new key
+             let existingKeys = lastAction.options.substring('.send_keys('.length, lastAction.options.length - 1);
+             lastAction.options = `.send_keys(${existingKeys}, ${targetKey})`;
+             // Update the sessionStorage directly
+             sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+        } else {
+          // Cannot aggregate, push new action
+          testingOutput.push(recordedData);
+          sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+        }
+        // --- END: Aggregation Logic Refinement ---
     }
-    sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   }
 
   function keyUpFunction(evt){

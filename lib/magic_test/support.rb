@@ -52,43 +52,32 @@ module MagicTest
       puts "(writing generated Capybara steps to `#{filepath}`.)"
 
       if output && !output.empty?
+        lines_to_add = []
         output.each do |event_data|
-          generated_code = ""
-          case event_data["action"]
-          when "magic_choose_open"
-            original_select_id = event_data["target"]
-            chosen_container_selector = "'##{original_select_id}_chosen'"
-            generated_code = "find(#{chosen_container_selector}).click"
-          when "magic_choose_select"
-            original_select_id = event_data["target"]
-            option_text = event_data["options"].to_s.gsub("'", "\\\\'")
-            chosen_container_selector = "'##{original_select_id}_chosen'"
-            generated_code = "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
-          when "magic_choose_search"
-            original_select_id = event_data["target"]
-            search_text = event_data["options"].to_s.gsub("'", "\\\'")
-            chosen_container_selector = "'##{original_select_id}_chosen'"
-            generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
-          when "find"
-            target = event_data["target"]
-            options = event_data["options"]
-            if options&.start_with?(".")
-              generated_code = "find(#{target})#{options}"
-            else
-              puts "WARN: MagicTest encountered 'find' action without a chained method (.click, .set, etc.): #{event_data.inspect}"
-              generated_code = "find(#{target})"
-            end
-          else
-            action = event_data["action"]
-            target = event_data["target"]
-            options = event_data["options"]
-            generated_code = "#{action} #{target}#{options}"
-          end
+          base_indentation = indentation
 
-          unless generated_code.empty?
-            chunks.first << indentation + generated_code + "\n"
-            @test_lines_written += 1
+          if event_data["scopeType"] == "within"
+            scope_selector = event_data["scopeSelector"]
+            lines_to_add << base_indentation + "within(#{scope_selector}) do"
+
+            nested_action_data = {
+              "action" => event_data["action"],
+              "target" => event_data["target"],
+              "options" => event_data["options"]
+            }
+            nested_code = generate_action_code(nested_action_data, base_indentation + "  ")
+            lines_to_add << nested_code unless nested_code.nil? || nested_code.empty?
+
+            lines_to_add << base_indentation + "end"
+          else
+            action_code = generate_action_code(event_data, base_indentation)
+            lines_to_add << action_code unless action_code.nil? || action_code.empty?
           end
+        end
+
+        lines_to_add.each do |line|
+          chunks.first << line + "\n"
+          @test_lines_written += 1
         end
 
         contents = chunks.flatten.join
@@ -171,6 +160,38 @@ module MagicTest
       caller.select { |s| s.include?("/test/") || s.include?("/spec/") }
         .reject { |s| s.include?("helper") }
         .first.split(":").first(2)
+    end
+
+    def generate_action_code(event_data, indentation)
+      generated_code = nil
+      action = event_data["action"]
+      target = event_data["target"]
+      options = event_data["options"]
+
+      case action
+      when "magic_choose_open"
+        chosen_container_selector = "'##{target}_chosen'"
+        generated_code = "find(#{chosen_container_selector}).click"
+      when "magic_choose_select"
+        option_text = options.to_s.gsub("'", "\\\'")
+        chosen_container_selector = "'##{target}_chosen'"
+        generated_code = "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
+      when "magic_choose_search"
+        search_text = options.to_s.gsub("'", "\\\'")
+        chosen_container_selector = "'##{target}_chosen'"
+        generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
+      when "find"
+        if options&.start_with?(".")
+          generated_code = "find(#{target})#{options}"
+        else
+          puts "WARN: MagicTest encountered 'find' action without a chained method (.click, .set, etc.): #{event_data.inspect}"
+          generated_code = "find(#{target})"
+        end
+      else
+        generated_code = "#{action} #{target}#{options}"
+      end
+
+      generated_code.nil? ? nil : indentation + generated_code
     end
   end
 end
