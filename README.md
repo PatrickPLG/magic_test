@@ -2,11 +2,57 @@
 
 Magic Test allows you to write Rails system tests interactively through a combination of trial-and-error in a debugger session and also just simple clicking around in the application being tested, all without the slowness of constantly restarting the testing environment. You can [see some videos of it in action](https://twitter.com/andrewculver/status/1366062684802846721)!
 
-> Magic Test is still in early development, and that includes the documentation. Any questions you have that aren't already address in the documentation should be [opened as issues](https://github.com/bullet-train-co/magic_test/issues/new) so they can be appropriately addressed in the documentation. 
+> **Note:** This is a **fork** of the original `magic_test` gem containing significant enhancements and fixes focused on improving the reliability and robustness of the generated test code.
 
-Magic Test was created by [Andrew Culver](http://twitter.com/andrewculver) and [Adam Pallozzi](https://twitter.com/adampallozzi).
+Magic Test was originally created by [Andrew Culver](http://twitter.com/andrewculver) and [Adam Pallozzi](https://twitter.com/adampallozzi).
 
-## Sponsored By
+## Key Enhancements in This Fork
+
+This version of Magic Test introduces several major improvements over the original:
+
+1.  **Significantly Improved Selector Generation:**
+    *   The core logic has been revamped to drastically reduce reliance on brittle XPath selectors.
+    *   A new heuristic approach prioritizes robust, semantic selectors:
+        *   Unique IDs (`#my-element`)
+        *   `name` attributes for form elements (`input[name="user[email]"]`)
+        *   Combinations of meaningful CSS classes (while attempting to filter out common utility classes like those from Bootstrap/Tailwind).
+        *   Falls back to more stable CSS selectors (like `tag[attribute]` or `tag.class`) before resorting to positional selectors like `:nth-of-type`.
+    *   **Benefit:** Generated tests are far more resilient to minor UI structure changes.
+
+2.  **Automatic `within` Block Generation:**
+    *   When a globally unique selector cannot be found for an interacted element, Magic Test now automatically searches up the DOM for a uniquely identifiable ancestor.
+    *   If a suitable ancestor (e.g., identified by ID or semantic class) is found, and the target element can be uniquely identified *relative* to that ancestor (using CSS selectors like `.class`, `tag.class:not(.other)`, or `tag:nth-of-type(n)`), Magic Test generates a nested `within` block.
+    *   **Example Output:**
+        ```ruby
+        within('#ancestor-id') do
+          find('.relative-target-class').click
+        end
+        ```
+    *   **Benefit:** Improves test structure, readability, and robustness by leveraging contextual scoping, further reducing the need for manual refinement.
+
+3.  **Enhanced Chosen.js Support:**
+    *   Provides more comprehensive recording for interactions with [Chosen.js](https://harvesthq.github.io/chosen/) widgets.
+    *   Supports:
+        *   Opening/closing dropdowns.
+        *   Searching within the dropdown.
+        *   Selecting options in both single and multi-selects.
+        *   **Deselecting options** in multi-selects.
+
+4.  **Programmatic Click Filtering:**
+    *   Uses `event.isTrusted` to differentiate between direct user clicks and clicks triggered programmatically by application JavaScript (e.g., `element.click()`).
+    *   **Benefit:** Prevents the recording of unwanted secondary events often triggered by application JS (like hidden form submissions), leading to cleaner and more accurate test steps focused on user actions.
+
+5.  **Improved SVG Click Handling:**
+    *   Clicks on SVG elements or their children (`<path>`, etc.) nested within interactive container elements (e.g., a `div` acting as a button) are now correctly attributed to the container.
+    *   **Benefit:** Allows the selector generation logic to find robust selectors for the container element instead of failing on the SVG itself.
+
+6.  **Session Reliability Fixes:**
+    *   Addresses issues where stale events could persist in browser `sessionStorage` between `flush` commands within a single `pry` session.
+    *   Ensures `flush` only processes events recorded since the last flush or the start of the `pry` session.
+
+These enhancements aim to make Magic Test a more powerful and reliable tool for generating robust Rails system tests with less manual intervention required after recording.
+
+## Sponsored By (Original Gem)
 
 <a href="https://bullettrain.co" target="_blank"><img src="https://github.com/CanCanCommunity/cancancan/raw/develop/logo/bullet_train.png" alt="Bullet Train" width="400"/></a>
 <br/>
@@ -14,106 +60,68 @@ Magic Test was created by [Andrew Culver](http://twitter.com/andrewculver) and [
 
 > Would you like to support Magic Test development and have your logo featured here? [Reach out!](http://twitter.com/andrewculver)
 
-## Installation
+## Installation (This Fork)
 
-Add this line to your application’s `Gemfile`:
+**Important:** Replace the original `magic_test` gem line in your `Gemfile`'s `:test` group with a reference to this fork (adjust `:github`, `:branch`, or path as needed):
 
 ```ruby
-gem 'magic_test', group: :test
+# Example using GitHub:
+gem 'magic_test', github: 'your-github-username/magic_test', branch: 'your-feature-branch', group: :test
+# Or using a local path:
+# gem 'magic_test', path: '../path/to/your/magic_test_fork', group: :test
 ```
 
 Then run the following in your shell:
 
-```
+```bash
 bundle install
 ```
 
-Next, run the install generator:
+If you haven't run the original installer before, run the install generator:
 
-```
+```bash
+# Only run this if you didn't run it for the original gem
 rails g magic_test:install
 ```
 
-With this we will:
+This will perform the initial setup (sample test, configuration updates, layout snippet). Review the changes carefully.
 
-- Create a sample system test at `test/system/basics_test.rb` that invokes Magic Test via the `magic_test` method.
-- Update your configuration to run a visible browser test if `MAGIC_TEST=1` is set as an environment variable, and a headless browser setting if the environment variable is not present.
-- Insert a snippet to render a partial before any closing `</head>` tags in your `*.html.erb` views within the `app/views/layouts` directory.
-> If you have any views containing `<head></head>` tags then please place this snippet so Magic Test can work accordingly.
+**Ensure Layout Snippet is Present:**
+Make sure the following snippet is present just before the closing `</head>` tag in your relevant layout files (`app/views/layouts/**/*.html.erb`):
 
 ```ruby+erb
 <%= render 'magic_test/support' if Rails.env.test? %>
 ```
 
-Generate binstubs by running `bundle binstubs magic_test` in the root of your Rails application. Now you'll be able to run Magic Test
-with the following command:
-
-```
-bin/magic test test/system/basics_test.rb # for MiniTest
-bin/magic spec spec/system/basics_spec.rb # for RSpec
-```
-
-The bin executable is implicitly running your Rails test with an environment variable that Magic Test looks for. 
-The full command looks like this: `MAGIC_TEST=1 rails test test/system/basics_test.rb`.
-
-You should be done now! To review what we’ve done for you, be sure to do a `git diff` at this point and make sure our generators didn’t break anything!
+**(Optional) Generate Binstubs:**
+Run `bundle binstubs magic_test` to create `bin/magic`.
 
 ## Usage
 
-### Running the Example Test
+The core usage remains similar to the original Magic Test:
 
-1. Open `test/system/basics_test.rb` in your editor of choice.
-2. Run `bin/magic test test/system/basics_test.rb` on your shell.
+1.  **Add `magic_test`:** Place the `magic_test` method call in your system test file where you want to start the interactive session.
+2.  **Run Test:** Execute your test using the `bin/magic` binstub (or `MAGIC_TEST=1 rails test ...`):
+    ```bash
+    bin/magic test test/system/your_test_file.rb
+    # or for RSpec:
+    # bin/magic spec spec/system/your_spec_file.rb
+    ```
+3.  **Interact:** This opens three windows:
+    *   **Debugger (Pry):** Interactively write/run Capybara commands. Type `ok` to save the last command/block.
+    *   **Browser:** Click around your application. Interactions are recorded.
+    *   **Editor:** Watch the test file update (mostly).
+4.  **Record Actions:** Click links, buttons, fill forms, select/deselect Chosen options, etc., in the browser. Magic Test will attempt to record these actions using the improved heuristics.
+5.  **Generate Assertions:** Highlight text and press `Ctrl+Shift+A` (or `Cmd+Shift+A` on Mac) or Right-Click to generate `assert page.has_content?` or `expect(page).to have_content` assertions.
+6.  **Flush Actions:** Go to the debugger console and type `flush`. Recorded browser interactions (and generated assertions) since the last `flush` will be converted to Capybara code and written to your test file below the `magic_test` line, using the enhanced selector and `within` block generation logic.
+7.  **Continue/Exit:** Continue interacting and flushing, or press `Ctrl+D` in the debugger to exit the session and finish the test run.
+8.  **Cleanup:** Remember to remove the `magic_test` call from your test file once you're finished writing it.
 
-This results in three windows:
-
-  1. **A debugger** where you can interactively write Capybara test code in the same context it would normally run.
-  2. **A browser** where you can click around the application and have your actions automatically converted into Capybara code.
-  3. **A editor** where you mostly just watch test code appear magically, but you can also edit it by hand should you need to.
-
-If you have the screen real estate, we recommend organizing the three windows so you can see them all at the same time. This is the intended Magic Test developer experience. The browser will always open to the left at a width of 800 pixels. This is done so you can set up your other windows just once and expect your browser to appear in the same place during every test.
-
-> #### Using Magic Test in New or Existing Tests
-> Just add a call to `magic_test` anywhere you want to start interactively developing test behavior and run the test the same way we've described above.
-
-### Writing Tests Manually in the Debugger Console
-
-You’re now free to issue Capybara commands in the debugger and see their results in the Chrome browser. If you type something and you’re happy with the result, type `ok` and hit enter to have the last line or block of code you wrote added to the test.
-
-When you’re done writing the test interactively, you can press <kbd>Control</kbd> + <kbd>D</kbd> to finish running the test.
-
-You can re-run `MAGIC_TEST=1 rails test test/system/basics_test.rb` or `bin/magic test test/system/basics_test.rb` to have the test execute up until the point where you stopped, and then re-enter the debugging session to continue writing the test. This is a great workflow for testing your work as you go.
-
-When you’re actually done writing the test, be sure to remove the `magic_test` reference in the test file.
-
-### Recording Your Test Actions in the Browser
-
-You can also write your tests by simply using your app in the browser window. This isn’t perfect yet by any means, but you’ll definitely get a sense for where we’re going with this and it’s already a pretty magical experience and a major productivity booster.
-
-You can click on buttons, click on links, fill in forms, and do many other things the way you would as a normal user. You may find there are certain shortcomings here, but our goal is to tackle all of those edge cases over time.
-
-### Generating Assertions in the Browser
-
-#### Method 1:
-If you want to add an assertion that some content exists on the page, simply highlight some text and press <kbd>Control</kbd><kbd>Shift</kbd> + <kbd>A</kbd>. You should see a confirm dialog asking for if you want to move forward with the assertion or cancel. 
-
-#### Method 2:
-You can now generate assertions by selecting your text and right-clicking with your mouse or touchpad. 
-
-### Flushing In Browser Actions and Assertions to the Test File
-
-The interactive actions you make in your app are not automatically written to your test.  When you are ready to write your actions out to the test, go to the terminal window and type `flush`.  This will flush all your recent actions out to the test file. It’s still early days for Magic Test, so you may find you need to clean up some of the output. Please don’t hesitate to [submit new issues](https://github.com/bullet-train-co/magic_test/issues/new) highlighting these scenarios so we can try to improve the results.
-
-### Ambiguous Labels and Elements
-
-When generating test code, we check to ensure a given label or element identifier won’t result in multiple or ambiguous matches the next time a test runs. If that situation arises, we’ll try to generate the appropriate `within` blocks and selectors to ensure the target button or field is disambiguated.
-
-## Acknowledgements
-We'd like to thank [Florian Plank](https://twitter.com/polarblau), the author of [Capycorder](https://github.com/polarblau/capycorder). His earlier attempt at the same concept (implemented via a Chrome extension) was ahead of its time and provided us with great inspiration and lessons learned when solving this problem from another angle.
+> **Key Difference:** Thanks to the enhancements, the code generated by `flush` should be significantly more robust, often requiring less manual cleanup, especially regarding selectors and scoping.
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/bullet-train-co/magic_test. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub (link to your fork).
 
 ## License
 

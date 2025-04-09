@@ -318,22 +318,52 @@
         target = originalSelectId; // Use original select ID
         options = element.textContent || element.innerText; // Get the selected option's text
         // Handle potential deselection in multi-select (may need refinement)
-      } else if (element.matches('ul.chosen-choices li.search-choice a.search-choice-close')) {
-        // TODO: Add handling for deselecting in multi-select if needed
-        // action = "magic_choose_deselect";
-        // target = originalSelectId;
-        // options = element.parentElement.querySelector('span').textContent;
-        console.log("MagicTest: Chosen multi-select deselect detected but not yet handled.");
-        return; // For now, don't record deselection
-      } else {
+      }
+      // --- START: Add Case for Deselection ---
+      // Case 3: Click to DESELECT an option in a multi-select
+      else if (element.matches('a.search-choice-close')) {
+        const choiceElement = element.closest('li.search-choice');
+        if (choiceElement) {
+            action = "magic_choose_deselect";
+            target = originalSelectId; // Use original select ID
+            // Find the text of the item being deselected (usually in a span)
+            const choiceTextElement = choiceElement.querySelector('span');
+            options = choiceTextElement ? (choiceTextElement.textContent || choiceTextElement.innerText) : '';
+            console.log(`[MagicTest Debug] Chosen Deselect detected. Target: ${target}, Option Text: ${options}`); // Debug Log
+            if (!options) {
+                 console.warn("[MagicTest Debug] Could not determine text for Chosen deselection on element:", choiceElement);
+                 return; // Don't record if we couldn't get the text
+            }
+        } else {
+             return; // Clicked close icon but couldn't find parent choice element
+        }
+      }
+      // --- END: Add Case for Deselection ---
+      // Case 4: Click on search input (often handled by keypress, but good to prevent default handling)
+       else if (element.matches('input.chosen-search-input')) {
+         return; // Let keypress handle search input interaction
+       }
+      // Case 5: Deselect in multi-select (Placeholder - Now Handled Above)
+      // else if (element.matches('ul.chosen-choices li.search-choice a.search-choice-close')) { // Old Placeholder
+      //   console.log("MagicTest: Chosen multi-select deselect detected but not yet handled.");
+      //   return; // Don't record deselection for now
+      // }
+
+      else { // Unknown click within chosen container
         return; // Click inside chosen, but not on a recognized interactive element
       }
 
-      // Record the custom chosen action
-      var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-      testingOutput.push({action: action, target: target, options: options });
-      sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-      return; // Prevent default click handling below
+      // Record the custom chosen action (if action was set)
+      if (action) { // Ensure an action was actually determined
+        console.log("[MagicTest Debug] Recording Chosen action:", {action: action, target: target, options: options }); // Log before push
+        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+        testingOutput.push({action: action, target: target, options: options });
+        sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+        // Update timestamp only if an action was recorded
+        lastClickTimestamp = Date.now(); // Update timestamp for debounce if needed for Chosen
+        console.log(`[MagicTest Debug] Updated lastClickTimestamp for Chosen action to: ${lastClickTimestamp}`);
+      }
+      return; // Prevent default click handling below for any handled Chosen interaction
     }
     // --- Chosen.js Handling --- END
 

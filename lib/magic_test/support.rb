@@ -183,6 +183,10 @@ module MagicTest
         search_text = options.to_s.gsub("'", "\\\'")
         chosen_container_selector = "'##{target}_chosen'"
         generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
+      when "magic_choose_deselect"
+        option_text = options.to_s.gsub("'", "\\\'")
+        chosen_container_selector = "'##{target}_chosen'"
+        generated_code = "find(#{chosen_container_selector}).find('li.search-choice', text: '#{option_text}').find('a.search-choice-close').click"
       when "find"
         if options&.start_with?(".")
           generated_code = "find(#{target})#{options}"
