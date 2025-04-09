@@ -153,73 +153,80 @@
     // Default handling for non-chosen elements
     if (tagName == "BUTTON" || tagName == "A" || (tagName == "INPUT" && element.type == 'submit')) {
       action = "click_on";
-      target = element.value || element.textContent || element.innerText; // Use textContent/innerText as fallback
-      if (!target) {
-        // Attempt to find a target using aria-label or title if standard text/value fails
+      // Prefer text content, value, aria-label, or title for click_on
+      target = element.textContent || element.innerText || element.value; // Order matters
+      if (!target || target.trim().length === 0) {
         target = element.getAttribute('aria-label') || element.getAttribute('title');
-        if (!target) {
-          // --- START: Use findBestSelector if text/aria/title fail ---
-           var selector = findBestSelector(element);
-           if (selector) {
-             var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
-             action = `find('${escapedSelector}')`;
-             target = `.click`;
-             options = "";
-           } else {
-             console.warn("MagicTest: Could not find suitable selector for button/link:", element);
-             return; // Still no target, ignore click
-           }
-          // --- END: Use findBestSelector ---
-        } else {
-           target = "\\'" + target.trim().replace(/'/g, "\\\\'") + "\\'";
-        }
+      }
+
+      if (target && target.trim().length > 0) {
+        // Found usable text/label -> Use click_on 'Target'
+        target = "\'" + target.trim().replace(/\'/g, "\\'") + "\'"; // Escape for Ruby
+        options = ""; // No options needed for click_on
       } else {
-         target = "\\'" + target.trim().replace(/'/g, "\\\\'") + "\\'";
+        // If no text/label found, fall back to CSS selector find
+        var selector = findBestSelector(element);
+        if (selector) {
+          var escapedSelector = selector.replace(/\'/g, "\\'"); // Escape for Ruby string
+          // --- START FIX: Correct recording format ---
+          // action = `find('${escapedSelector}')`;
+          // target = `.click`; // Append .click on the Ruby side
+          // options = "";
+          action = "find";
+          target = `'\''${escapedSelector}'\'`; // Embed selector in single quotes
+          options = ".click";
+          // --- END FIX ---
+        } else {
+          console.warn("MagicTest: Could not find suitable text or selector for button/link:", element);
+          return; // Cannot reliably identify, ignore click
+        }
       }
-    } else if (tagName == "INPUT") {
-      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local'];
+    }
+    // Priority 2: Other Input Types (Clicks on checkbox, radio etc.)
+    else if (tagName == "INPUT") {
+      // Ignore clicks that just focus text-like inputs (handled by keypress/fill_in)
+      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local', 'color', 'range', 'file']; // Expanded ignore list
       if (ignoreType.includes(element.type)) {
-        return; // Ignore clicks that are just focusing text-like inputs
+        return;
       }
-      // --- START: Use findBestSelector instead of XPath ---
-      // var path = getPathTo(element);
-      // action = `find(:xpath, '${path}').click`;
-      // target = ""; // No target needed for xpath click
-      // options = "";
+      // For other input types (checkbox, radio, etc.), use findBestSelector
       var selector = findBestSelector(element);
       if (selector) {
-        var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
-        action = `find('${escapedSelector}')`;
-        target = `.click`;
-        options = "";
+        var escapedSelector = selector.replace(/\'/g, "\\'"); // Escape for Ruby string
+        // --- START FIX: Correct recording format ---
+        // action = `find('${escapedSelector}')`;
+        // target = `.click`; // Append .click on the Ruby side
+        // options = "";
+        action = "find";
+        target = `'\''${escapedSelector}'\'`; // Embed selector in single quotes
+        options = ".click";
+        // --- END FIX ---
       } else {
          console.warn("MagicTest: Could not find suitable selector for input:", element);
          return; // Cannot determine a reliable way to record this click
       }
-      // --- END: Use findBestSelector instead of XPath ---
-    } else {
-      // Maybe it's a label or some other clickable element? Try xpath.
-      // --- START: Use findBestSelector instead of XPath ---
-      // var path = getPathTo(element);
-      // if (path) {
-      //    action = `find(:xpath, '${path}').click`;
-      //    target = "";
-      //    options = "";
-      // } else {
-      //    return; // Cannot determine a reliable way to record this click
-      // }
+    }
+    // Priority 3: General Fallback for other clickable elements (divs, spans, svgs etc.)
+    else {
       var selector = findBestSelector(element);
       if (selector) {
-        var escapedSelector = selector.replace(/'/g, "\\\\'"); // Escape for Ruby string
-        action = `find('${escapedSelector}')`;
-        target = `.click`;
-        options = "";
+        var escapedSelector = selector.replace(/\'/g, "\\'"); // Escape for Ruby string
+        // --- START FIX: Correct recording format ---
+        // action = `find('${escapedSelector}')`;
+        // target = `.click`; // Append .click on the Ruby side
+        // options = "";
+        action = "find";
+        target = `'\''${escapedSelector}'\'`; // Embed selector in single quotes
+        options = ".click";
+        // --- END FIX ---
       } else {
-         console.warn("MagicTest: Could not find suitable selector for element:", element);
+         // If even findBestSelector fails, log it and ignore the click
+         console.warn("MagicTest: Could not find suitable selector for generic element:", element);
          return; // Cannot determine a reliable way to record this click
       }
-      // --- END: Use findBestSelector instead of XPath ---
     }
+
+    // Record the determined action
     var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     testingOutput.push({action: action, target: target, options: options });
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
