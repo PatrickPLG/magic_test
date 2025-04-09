@@ -309,7 +309,22 @@
     return null;
   }
 
+  // --- START: Debounce logic variables ---
+  let lastClickTimestamp = 0;
+  const CLICK_DEBOUNCE_MS = 150; // Ignore clicks within 150ms of the last recorded one
+  // --- END: Debounce logic variables ---
+
   function clickFunction(event) {
+    // --- START: Debounce Check ---
+    const now = Date.now();
+    if (now - lastClickTimestamp < CLICK_DEBOUNCE_MS) {
+        console.log(`[MagicTest Debug] Debouncing click event (target: ${event.target.id || event.target.tagName}). Time since last: ${now - lastClickTimestamp}ms.`);
+        // Optional: More specific check - if the debounced target is the known submit button?
+        // if (event.target.id === 'submit-button') { ... }
+        return; // Ignore this click, likely triggered programmatically
+    }
+    // --- END: Debounce Check ---
+
     let element = event.target;
     console.log("[MagicTest Debug] clickFunction triggered. Initial event.target:", element); // Debug Log
 
@@ -458,9 +473,15 @@
 
     // Record the determined action if found
     if (recordedData) {
+        console.log("[MagicTest Debug] Recording data:", recordedData);
         var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
         testingOutput.push(recordedData);
         sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+        // --- START: Update last click timestamp AFTER recording ---
+        lastClickTimestamp = now;
+        // --- END: Update last click timestamp ---
+    } else {
+        console.log("[MagicTest Debug] No data recorded for this click.");
     }
   };
 
