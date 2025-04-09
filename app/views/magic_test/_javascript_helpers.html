@@ -167,13 +167,16 @@
         // If no text/label found, fall back to CSS selector find
         var selector = findBestSelector(element);
         if (selector) {
-          var escapedSelector = selector.replace(/\'/g, "\\'"); // Escape for Ruby string
+          var escapedSelector = selector.replace(/\'/g, "\\\'"); // Escape for Ruby string
           // --- START FIX: Correct recording format ---
           // action = `find('${escapedSelector}')`;
           // target = `.click`; // Append .click on the Ruby side
           // options = "";
           action = "find";
-          target = `'\''${escapedSelector}'\'`; // Embed selector in single quotes
+          // --- START FIX: Correct Quoting ---
+          // target = `'''${escapedSelector}'''`; // Embed selector in single quotes
+          target = `'${escapedSelector}'`; // Embed selector in single quotes
+          // --- END FIX: Correct Quoting ---
           options = ".click";
           // --- END FIX ---
         } else {
@@ -192,13 +195,16 @@
       // For other input types (checkbox, radio, etc.), use findBestSelector
       var selector = findBestSelector(element);
       if (selector) {
-        var escapedSelector = selector.replace(/\'/g, "\\'"); // Escape for Ruby string
+        var escapedSelector = selector.replace(/\'/g, "\\\'"); // Escape for Ruby string
         // --- START FIX: Correct recording format ---
         // action = `find('${escapedSelector}')`;
         // target = `.click`; // Append .click on the Ruby side
         // options = "";
         action = "find";
-        target = `'\''${escapedSelector}'\'`; // Embed selector in single quotes
+        // --- START FIX: Correct Quoting ---
+        // target = `'''${escapedSelector}'''`; // Embed selector in single quotes
+        target = `'${escapedSelector}'`; // Embed selector in single quotes
+        // --- END FIX: Correct Quoting ---
         options = ".click";
         // --- END FIX ---
       } else {
@@ -210,13 +216,16 @@
     else {
       var selector = findBestSelector(element);
       if (selector) {
-        var escapedSelector = selector.replace(/\'/g, "\\'"); // Escape for Ruby string
+        var escapedSelector = selector.replace(/\'/g, "\\\'"); // Escape for Ruby string
         // --- START FIX: Correct recording format ---
         // action = `find('${escapedSelector}')`;
         // target = `.click`; // Append .click on the Ruby side
         // options = "";
         action = "find";
-        target = `'\''${escapedSelector}'\'`; // Embed selector in single quotes
+        // --- START FIX: Correct Quoting ---
+        // target = `'''${escapedSelector}'''`; // Embed selector in single quotes
+        target = `'${escapedSelector}'`; // Embed selector in single quotes
+        // --- END FIX: Correct Quoting ---
         options = ".click";
         // --- END FIX ---
       } else {
