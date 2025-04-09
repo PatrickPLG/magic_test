@@ -162,15 +162,17 @@
              }
           }
 
-          // 3. Try Tag + Single Semantic Class :not(.otherSemanticClass) - Handles ticket button case
-          //    Checks if combining a class the element *has* with one it *lacks* (but a sibling might have) creates uniqueness.
+          // 3. Try Tag + Single Semantic Class :not(.otherSemanticClass)
           if (targetEl.classList && targetEl.classList.length > 0) {
-            console.log("[MagicTest Debug] Relative Check 3 (:not() logic) starting..."); // Debug Log
+             console.log("[MagicTest Debug] Relative Check 3 (:not() logic) starting..."); // Debug Log
             const semanticClassesOnTarget = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
             const siblings = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName && child !== targetEl);
-            console.log("[MagicTest Debug] Relative Check 3: Target Classes:", semanticClassesOnTarget, "Siblings:", siblings); // Debug Log
+             console.log("[MagicTest Debug] Relative Check 3: Target Classes:", semanticClassesOnTarget, "Siblings:", siblings); // Debug Log
 
             for (const targetCls of semanticClassesOnTarget) {
+              // --- Add check for valid targetCls ---
+              if (!targetCls || targetCls.trim() === '') continue;
+              // -------------------------------------
               let baseClassSelector = `.${escapeCSSIdentifier(targetCls)}`;
               let differentiatingNotClasses = [];
               console.log(`[MagicTest Debug] Relative Check 3: Checking target class '${targetCls}'`); // Debug Log
@@ -178,7 +180,13 @@
                  if(sibling.classList.contains(targetCls)) {
                     console.log(`[MagicTest Debug] Relative Check 3: Comparing with sibling:`, sibling); // Debug Log
                     Array.from(sibling.classList).forEach(siblingCls => {
-                        if (!BOOTSTRAP_CLASS_REGEX.test(siblingCls) && !targetEl.classList.contains(siblingCls)) {
+                        // --- Add detailed log before the IF ---
+                        const isSemantic = !BOOTSTRAP_CLASS_REGEX.test(siblingCls);
+                        const targetLacks = !targetEl.classList.contains(siblingCls);
+                        console.log(`[MagicTest Debug] Relative Check 3: Sibling class '${siblingCls}'. IsSemantic? ${isSemantic}. Target Lacks? ${targetLacks}`);
+                        // ------------------------------------
+                        // Check if the sibling class is semantic AND the target element does NOT have it.
+                        if (isSemantic && targetLacks) {
                            if (!differentiatingNotClasses.includes(siblingCls)) {
                                console.log(`[MagicTest Debug] Relative Check 3: Found differentiating class '${siblingCls}'`); // Debug Log
                                differentiatingNotClasses.push(siblingCls);
@@ -187,6 +195,7 @@
                     });
                  }
               });
+              console.log(`[MagicTest Debug] Relative Check 3: Differentiating classes found for targetCls '${targetCls}':`, differentiatingNotClasses); // Log after checking all siblings
 
               if (differentiatingNotClasses.length > 0) {
                 const notSelectors = differentiatingNotClasses.map(cls => `:not(.${escapeCSSIdentifier(cls)})`).join('');
@@ -216,18 +225,26 @@
           }
 
           // 4. Positional Fallback: :nth-of-type
-          //    Calculate the index among siblings of the same tag name
           console.log("[MagicTest Debug] Relative Check 4 (:nth-of-type) starting..."); // Debug Log
-          let index = -1;
-          const siblingsOfType = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName);
-          for(let i = 0; i < siblingsOfType.length; i++) {
-              if (siblingsOfType[i] === targetEl) {
-                  index = i + 1; // CSS :nth-of-type is 1-based
-                  break;
+          // --- START: Replace :nth-of-type index calculation ---
+          // let index = -1;
+          // const siblingsOfType = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName);
+          // for(let i = 0; i < siblingsOfType.length; i++) { if (siblingsOfType[i] === targetEl) { index = i + 1; break; } }
+          let index = 0; // Use 0 to indicate not found, becomes 1-based index
+          let count = 0;
+          for (const child of ancestorEl.children) {
+              if (child.tagName === targetEl.tagName) {
+                  count++; // Increment counter for elements of this type
+                  if (child === targetEl) {
+                      index = count; // Found it, store the 1-based index
+                      console.log(`[MagicTest Debug] Relative Check 4: Found target element at 1-based index ${index}`); // Log success
+                      break;
+                  }
               }
           }
+          // --- END: Replace :nth-of-type index calculation ---
           console.log(`[MagicTest Debug] Relative Check 4: Calculated index ${index}`); // Debug Log
-          if (index > 0) {
+          if (index > 0) { // Check if index was found (is > 0)
               const candidateSelector = `${targetTagName}:nth-of-type(${index})`;
               console.log(`[MagicTest Debug] Relative Check 4: Trying '${candidateSelector}'`); // Debug Log
               try {
