@@ -1,6 +1,7 @@
 <script text="text/javascript">
 
   // --- START: New Selector Logic ---
+  console.log("[MagicTest Debug] Initializing selector logic..."); // Debug Log
   const BOOTSTRAP_CLASS_REGEX = /^(m|p|d-|g-|col|align|justify|text|bg|border|flex|order|fs-|fw-|lh-|w-|h-|position-|top-|bottom-|start-|end-|translate-|rounded|shadow|overflow-|float-|object-|opacity-|visibility-|z-)/;
   const MAX_ANCESTOR_SEARCH_DEPTH = 5; // Limit how far up we look for a scope
 
@@ -29,21 +30,32 @@
   // Tries to find the most robust and semantic CSS selector for a given element
   // Returns an object: { type: 'global'| 'scoped' | 'none', selector?, ancestorSelector?, targetSelector? }
   function findBestSelector(element) {
-    if (!element) return { type: 'none' };
+    console.log("[MagicTest Debug] findBestSelector called for:", element); // Debug Log
+    if (!element) {
+        console.log("[MagicTest Debug] Element is null, returning { type: 'none' }"); // Debug Log
+        return { type: 'none' };
+    }
 
     // --- Try finding a GLOBALLY unique selector first ---
-    function findGlobalSelector(el) {
+    function findGlobalSelector(el, context = "Global") {
+      console.log(`[MagicTest Debug] findGlobalSelector (${context}) checking:`, el); // Debug Log
       // 1. ID
       if (el.id) {
         const idSelector = `#${escapeCSSIdentifier(el.id)}`;
-        if (isUnique(idSelector)) return idSelector;
+        if (isUnique(idSelector)) {
+          console.log(`[MagicTest Debug] (${context}) ID Check: '${idSelector}' -> Unique? ${!!idSelector}`); // Debug Log
+          return idSelector;
+        }
       }
 
       // 2. Name (for form elements)
       const tagName = el.tagName.toUpperCase();
       if (['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON'].includes(tagName) && el.name) {
         const nameSelector = `${tagName.toLowerCase()}[name="${el.name}"]`;
-        if (isUnique(nameSelector)) return nameSelector;
+        if (isUnique(nameSelector)) {
+          console.log(`[MagicTest Debug] (${context}) Name Check: '${nameSelector}' -> Unique? ${!!nameSelector}`); // Debug Log
+          return nameSelector;
+        }
       }
 
       // 3. & 4. Label/Button Text (Handled directly in event handlers for now)
@@ -53,7 +65,10 @@
         const semanticClasses = Array.from(el.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
         if (semanticClasses.length > 0) {
           const classSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
-          if (isUnique(classSelector)) return classSelector;
+          if (isUnique(classSelector)) {
+            console.log(`[MagicTest Debug] (${context}) Class Check: '${classSelector}' -> Unique? ${!!classSelector}`); // Debug Log
+            return classSelector;
+          }
         }
       }
 
@@ -62,34 +77,46 @@
       if (tagName === 'INPUT' && el.type) {
         fallbackSelector += `[type="${el.type}"]`;
       } // Add other attributes if needed
-      if (isUnique(fallbackSelector)) return fallbackSelector;
+      if (isUnique(fallbackSelector)) {
+        console.log(`[MagicTest Debug] (${context}) Fallback Check: '${fallbackSelector}' -> Unique? ${!!fallbackSelector}`); // Debug Log
+        return fallbackSelector;
+      }
 
       // 7. Last Resort: Tag + Single Semantic Class
       if (el.classList && el.classList.length > 0) {
          const semanticClasses = Array.from(el.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
          for (const cls of semanticClasses) {
            const singleClassSelector = `${tagName.toLowerCase()}.${escapeCSSIdentifier(cls)}`;
-           if (isUnique(singleClassSelector)) return singleClassSelector;
+           if (isUnique(singleClassSelector)) {
+             console.log(`[MagicTest Debug] (${context}) Single Class Check: '${singleClassSelector}' -> Unique? ${!!singleClassSelector}`); // Debug Log
+             return singleClassSelector;
+           }
          }
       }
+      console.log(`[MagicTest Debug] (${context}) No unique global selector found for:`, el); // Debug Log
       return null; // No globally unique selector found for this element
     }
 
     let globalSelector = findGlobalSelector(element);
     if (globalSelector) {
+      console.log("[MagicTest Debug] Found GLOBAL selector:", globalSelector); // Debug Log
       return { type: 'global', selector: globalSelector };
     }
+    console.log("[MagicTest Debug] No global selector found for target. Starting ancestor search..."); // Debug Log
 
     // --- If no global selector, try finding a SCOPED context ---
     let currentElement = element;
     for (let depth = 0; depth < MAX_ANCESTOR_SEARCH_DEPTH; depth++) {
       let ancestorElement = currentElement.parentElement;
+      console.log(`[MagicTest Debug] Ancestor search depth ${depth}, checking parent:`, ancestorElement); // Debug Log
       if (!ancestorElement || ancestorElement.tagName === 'BODY' || ancestorElement.tagName === 'HTML') {
+        console.log("[MagicTest Debug] Reached top or no parent, stopping ancestor search."); // Debug Log
         break; // Stop if we reach the top or run out of parents
       }
 
-      let ancestorSelector = findGlobalSelector(ancestorElement); // Can the ancestor be uniquely identified?
+      let ancestorSelector = findGlobalSelector(ancestorElement, `Ancestor Depth ${depth}`); // Can the ancestor be uniquely identified?
       if (ancestorSelector) {
+        console.log(`[MagicTest Debug] Found UNIQUE ANCESTOR at depth ${depth}: '${ancestorSelector}'`, ancestorElement); // Debug Log
         // Found a unique ancestor. Now try to find the original target *relative* to it.
         // Use simple selectors for the relative target (e.g., classes, tag+attribute)
         const tagName = element.tagName.toUpperCase();
@@ -97,6 +124,7 @@
 
         // --- START: Refactored Relative Selector Search ---
         function findRelativeSelector(targetEl, ancestorEl) {
+          console.log("[MagicTest Debug] findRelativeSelector called. Target:", targetEl, "Ancestor:", ancestorEl); // Debug Log
           const targetTagName = targetEl.tagName.toLowerCase();
 
           // 1. Try all semantic classes (if unique within scope)
@@ -104,10 +132,15 @@
             const semanticClasses = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
             if (semanticClasses.length > 0) {
               const candidateSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
+              console.log(`[MagicTest Debug] Relative Check 1 (Combined Classes): Trying '${candidateSelector}'`); // Debug Log
               try {
                 const matches = ancestorEl.querySelectorAll(candidateSelector);
-                if (matches.length === 1 && matches[0] === targetEl) return candidateSelector;
-              } catch(e) { /* ignore */ }
+                console.log(`[MagicTest Debug] Relative Check 1 Result: Found ${matches.length} elements.`); // Debug Log
+                if (matches.length === 1 && matches[0] === targetEl) {
+                   console.log("[MagicTest Debug] Relative Check 1 SUCCESS!"); // Debug Log
+                   return candidateSelector;
+                }
+              } catch(e) { console.warn("[MagicTest Debug] Relative Check 1 Error:", e); }
             }
           }
 
@@ -116,57 +149,75 @@
           for (const attr of uniqueAttrs) {
              if (targetEl.hasAttribute(attr)) {
                  const attrValue = targetEl.getAttribute(attr);
-                 const candidateSelector = `${targetTagName}[${attr}="${attrValue}"]`;
+                 const candidateSelector = `${targetTagName}[${attr}="${CSS.escape(attrValue)}"]`;
+                 console.log(`[MagicTest Debug] Relative Check 2 (Attribute ${attr}): Trying '${candidateSelector}'`); // Debug Log
                  try {
                      const matches = ancestorEl.querySelectorAll(candidateSelector);
-                     if (matches.length === 1 && matches[0] === targetEl) return candidateSelector;
-                 } catch(e) { /* ignore */ }
+                     console.log(`[MagicTest Debug] Relative Check 2 Result: Found ${matches.length} elements.`); // Debug Log
+                     if (matches.length === 1 && matches[0] === targetEl) {
+                        console.log("[MagicTest Debug] Relative Check 2 SUCCESS!"); // Debug Log
+                        return candidateSelector;
+                     }
+                 } catch(e) { console.warn("[MagicTest Debug] Relative Check 2 Error:", e); }
              }
           }
 
           // 3. Try Tag + Single Semantic Class :not(.otherSemanticClass) - Handles ticket button case
           //    Checks if combining a class the element *has* with one it *lacks* (but a sibling might have) creates uniqueness.
           if (targetEl.classList && targetEl.classList.length > 0) {
-            const semanticClasses = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+            console.log("[MagicTest Debug] Relative Check 3 (:not() logic) starting..."); // Debug Log
+            const semanticClassesOnTarget = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
             const siblings = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName && child !== targetEl);
+            console.log("[MagicTest Debug] Relative Check 3: Target Classes:", semanticClassesOnTarget, "Siblings:", siblings); // Debug Log
 
-            for (const targetCls of semanticClasses) {
-              // Find classes that siblings have but the target doesn't
-              let missingClasses = [];
+            for (const targetCls of semanticClassesOnTarget) {
+              let baseClassSelector = `.${escapeCSSIdentifier(targetCls)}`;
+              let differentiatingNotClasses = [];
+              console.log(`[MagicTest Debug] Relative Check 3: Checking target class '${targetCls}'`); // Debug Log
               siblings.forEach(sibling => {
-                 if(sibling.classList.contains(targetCls)) { // Only compare siblings with the same primary class
+                 if(sibling.classList.contains(targetCls)) {
+                    console.log(`[MagicTest Debug] Relative Check 3: Comparing with sibling:`, sibling); // Debug Log
                     Array.from(sibling.classList).forEach(siblingCls => {
                         if (!BOOTSTRAP_CLASS_REGEX.test(siblingCls) && !targetEl.classList.contains(siblingCls)) {
-                           if (!missingClasses.includes(siblingCls)) missingClasses.push(siblingCls);
+                           if (!differentiatingNotClasses.includes(siblingCls)) {
+                               console.log(`[MagicTest Debug] Relative Check 3: Found differentiating class '${siblingCls}'`); // Debug Log
+                               differentiatingNotClasses.push(siblingCls);
+                           }
                         }
                     });
                  }
               });
 
-              // Try selector like .targetClass:not(.missingClass1):not(.missingClass2)
-              if (missingClasses.length > 0) {
-                const notSelectors = missingClasses.map(cls => `:not(.${escapeCSSIdentifier(cls)})`).join('');
-                const candidateSelector = `.${escapeCSSIdentifier(targetCls)}${notSelectors}`;
+              if (differentiatingNotClasses.length > 0) {
+                const notSelectors = differentiatingNotClasses.map(cls => `:not(.${escapeCSSIdentifier(cls)})`).join('');
+                const candidateSelector = `${targetTagName}${baseClassSelector}${notSelectors}`;
+                console.log(`[MagicTest Debug] Relative Check 3: Trying :not() selector '${candidateSelector}'`); // Debug Log
                  try {
                      const matches = ancestorEl.querySelectorAll(candidateSelector);
-                     // Correction: Need to check targetTagName as well
-                     const fullCandidateSelector = `${targetTagName}${candidateSelector}`;
-                     const fullMatches = ancestorEl.querySelectorAll(fullCandidateSelector);
-
-                     if (fullMatches.length === 1 && fullMatches[0] === targetEl) return fullCandidateSelector;
-                 } catch(e) { /* ignore */ }
+                     console.log(`[MagicTest Debug] Relative Check 3 (:not() query) Result: Found ${matches.length} elements.`); // Debug Log
+                     if (matches.length === 1 && matches[0] === targetEl) {
+                       console.log("[MagicTest Debug] Relative Check 3 SUCCESS (:not() worked)!"); // Debug Log
+                       return candidateSelector;
+                     }
+                 } catch(e) { console.warn("[MagicTest Debug] Relative Check 3 (:not() query) Error:", e); }
               }
-               // Also try the simple class on its own if not tried above or if it failed
-               const simpleClassSelector = `${targetTagName}.${escapeCSSIdentifier(targetCls)}`;
+
+              const simpleTagAndClassSelector = `${targetTagName}${baseClassSelector}`;
+              console.log(`[MagicTest Debug] Relative Check 3: Trying simple tag+class '${simpleTagAndClassSelector}'`); // Debug Log
                try {
-                 const simpleMatches = ancestorEl.querySelectorAll(simpleClassSelector);
-                 if (simpleMatches.length === 1 && simpleMatches[0] === targetEl) return simpleClassSelector;
-               } catch(e) { /* ignore */ }
+                 const simpleMatches = ancestorEl.querySelectorAll(simpleTagAndClassSelector);
+                 console.log(`[MagicTest Debug] Relative Check 3 (simple tag+class query) Result: Found ${simpleMatches.length} elements.`); // Debug Log
+                 if (simpleMatches.length === 1 && simpleMatches[0] === targetEl) {
+                    console.log("[MagicTest Debug] Relative Check 3 SUCCESS (simple tag+class worked)!"); // Debug Log
+                    return simpleTagAndClassSelector;
+                 }
+               } catch(e) { console.warn("[MagicTest Debug] Relative Check 3 (simple tag+class query) Error:", e); }
             }
           }
 
           // 4. Positional Fallback: :nth-of-type
           //    Calculate the index among siblings of the same tag name
+          console.log("[MagicTest Debug] Relative Check 4 (:nth-of-type) starting..."); // Debug Log
           let index = -1;
           const siblingsOfType = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName);
           for(let i = 0; i < siblingsOfType.length; i++) {
@@ -175,27 +226,35 @@
                   break;
               }
           }
+          console.log(`[MagicTest Debug] Relative Check 4: Calculated index ${index}`); // Debug Log
           if (index > 0) {
               const candidateSelector = `${targetTagName}:nth-of-type(${index})`;
+              console.log(`[MagicTest Debug] Relative Check 4: Trying '${candidateSelector}'`); // Debug Log
               try {
                   // Verify this selector actually selects the target element within the ancestor
                   const match = ancestorEl.querySelector(candidateSelector);
                   if (match === targetEl) {
                       // Double check uniqueness just in case querySelector picked the first of multiple matches somehow (unlikely but safe)
                        const matches = ancestorEl.querySelectorAll(candidateSelector);
-                       if (matches.length === 1) return candidateSelector;
+                       if (matches.length === 1) {
+                           console.log("[MagicTest Debug] Relative Check 4 SUCCESS!"); // Debug Log
+                           return candidateSelector;
+                       }
                   }
-              } catch(e) { /* ignore */ }
+              } catch(e) { console.warn("[MagicTest Debug] Relative Check 4 Error:", e); }
           }
 
+          console.log("[MagicTest Debug] findRelativeSelector: FAILED to find unique relative selector."); // Debug Log
           return null; // No unique relative selector found
         }
 
         relativeSelector = findRelativeSelector(element, ancestorElement);
+        console.log(`[MagicTest Debug] Result of findRelativeSelector: '${relativeSelector}'`); // Debug Log
         // --- END: Refactored Relative Selector Search ---
 
         // If we found a unique relative selector for the target within this unique ancestor
         if (relativeSelector) {
+          console.log(`[MagicTest Debug] Found SCOPED selector. Ancestor: '${ancestorSelector}', Target: '${relativeSelector}'`); // Debug Log
           return {
             type: 'scoped',
             ancestorSelector: ancestorSelector,
@@ -208,6 +267,7 @@
     }
 
     // If loop finishes without finding a scoped context
+    console.log("[MagicTest Debug] findBestSelector: FAILED to find global or scoped selector. Returning { type: 'none' }."); // Debug Log
     return { type: 'none' };
   }
   // --- END: New Selector Logic ---
@@ -228,7 +288,20 @@
   }
 
   function clickFunction(event) {
-    var element = event.target;
+    let element = event.target;
+    console.log("[MagicTest Debug] clickFunction triggered. Initial event.target:", element); // Debug Log
+
+    // --- START: Handle clicks on SVG children ---
+    // If the click is on an SVG or its child (PATH, etc.), find the nearest ancestor container
+    // that we might actually want to target (e.g., the surrounding button or div).
+    // Let's assume actionable containers might have specific classes like 'quantity-btn' or data attributes.
+    const actionableParent = element.closest('.quantity-btn'); // Example: Check for closest '.quantity-btn'
+    if (actionableParent && actionableParent !== element) {
+       console.log("[MagicTest Debug] Click target was inside an actionable parent. Switching target to parent:", actionableParent); // Debug Log
+       element = actionableParent; // Use the container div as the target for selector finding
+    }
+    // --- END: Handle clicks on SVG children ---
+
     var tagName = element.tagName;
     var action = "";
     var target = "";
