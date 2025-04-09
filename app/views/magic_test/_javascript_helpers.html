@@ -95,54 +95,104 @@
         const tagName = element.tagName.toUpperCase();
         let relativeSelector = null;
 
-        // Try simple tag name first (if unique within ancestor)
-        if (ancestorElement.querySelectorAll(tagName.toLowerCase()).length === 1) {
-           // Ensure it's our specific element
-           if (ancestorElement.querySelector(tagName.toLowerCase()) === element) {
-              relativeSelector = tagName.toLowerCase();
-           }
-        }
+        // --- START: Refactored Relative Selector Search ---
+        function findRelativeSelector(targetEl, ancestorEl) {
+          const targetTagName = targetEl.tagName.toLowerCase();
 
-        // Try semantic classes (relative uniqueness)
-        if (!relativeSelector && element.classList && element.classList.length > 0) {
-          const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
-          if (semanticClasses.length > 0) {
-            const scopedClassSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
-            try {
-              const matches = ancestorElement.querySelectorAll(scopedClassSelector);
-              if (matches.length === 1 && matches[0] === element) {
-                relativeSelector = scopedClassSelector;
-              }
-            } catch(e) { /* ignore invalid selectors */ }
+          // 1. Try all semantic classes (if unique within scope)
+          if (targetEl.classList && targetEl.classList.length > 0) {
+            const semanticClasses = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+            if (semanticClasses.length > 0) {
+              const candidateSelector = '.' + semanticClasses.map(escapeCSSIdentifier).join('.');
+              try {
+                const matches = ancestorEl.querySelectorAll(candidateSelector);
+                if (matches.length === 1 && matches[0] === targetEl) return candidateSelector;
+              } catch(e) { /* ignore */ }
+            }
           }
-        }
 
-        // Try tag + type (relative uniqueness)
-        if (!relativeSelector && tagName === 'INPUT' && element.type) {
-            const scopedTagTypeSelector = `${tagName.toLowerCase()}[type="${element.type}"]`;
-            try {
-                 const matches = ancestorElement.querySelectorAll(scopedTagTypeSelector);
-                 if (matches.length === 1 && matches[0] === element) {
-                     relativeSelector = scopedTagTypeSelector;
+          // 2. Try specific attributes like name, title (if unique within scope)
+          const uniqueAttrs = ['name', 'title', 'aria-label']; // Add others if needed
+          for (const attr of uniqueAttrs) {
+             if (targetEl.hasAttribute(attr)) {
+                 const attrValue = targetEl.getAttribute(attr);
+                 const candidateSelector = `${targetTagName}[${attr}="${attrValue}"]`;
+                 try {
+                     const matches = ancestorEl.querySelectorAll(candidateSelector);
+                     if (matches.length === 1 && matches[0] === targetEl) return candidateSelector;
+                 } catch(e) { /* ignore */ }
+             }
+          }
+
+          // 3. Try Tag + Single Semantic Class :not(.otherSemanticClass) - Handles ticket button case
+          //    Checks if combining a class the element *has* with one it *lacks* (but a sibling might have) creates uniqueness.
+          if (targetEl.classList && targetEl.classList.length > 0) {
+            const semanticClasses = Array.from(targetEl.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
+            const siblings = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName && child !== targetEl);
+
+            for (const targetCls of semanticClasses) {
+              // Find classes that siblings have but the target doesn't
+              let missingClasses = [];
+              siblings.forEach(sibling => {
+                 if(sibling.classList.contains(targetCls)) { // Only compare siblings with the same primary class
+                    Array.from(sibling.classList).forEach(siblingCls => {
+                        if (semanticClasses.includes(siblingCls) && !targetEl.classList.contains(siblingCls)) {
+                           if (!missingClasses.includes(siblingCls)) missingClasses.push(siblingCls);
+                        }
+                    });
                  }
-            } catch(e) { /* ignore invalid selectors */ }
-        }
+              });
 
-        // Try tag + single semantic class (relative uniqueness)
-        if (!relativeSelector && element.classList && element.classList.length > 0) {
-           const semanticClasses = Array.from(element.classList).filter(cls => !BOOTSTRAP_CLASS_REGEX.test(cls));
-           for (const cls of semanticClasses) {
-               const scopedSingleClassSelector = `${tagName.toLowerCase()}.${escapeCSSIdentifier(cls)}`;
+              // Try selector like .targetClass:not(.missingClass1):not(.missingClass2)
+              if (missingClasses.length > 0) {
+                const notSelectors = missingClasses.map(cls => `:not(.${escapeCSSIdentifier(cls)})`).join('');
+                const candidateSelector = `.${escapeCSSIdentifier(targetCls)}${notSelectors}`;
+                 try {
+                     const matches = ancestorEl.querySelectorAll(candidateSelector);
+                     // Correction: Need to check targetTagName as well
+                     const fullCandidateSelector = `${targetTagName}${candidateSelector}`;
+                     const fullMatches = ancestorEl.querySelectorAll(fullCandidateSelector);
+
+                     if (fullMatches.length === 1 && fullMatches[0] === targetEl) return fullCandidateSelector;
+                 } catch(e) { /* ignore */ }
+              }
+               // Also try the simple class on its own if not tried above or if it failed
+               const simpleClassSelector = `${targetTagName}.${escapeCSSIdentifier(targetCls)}`;
                try {
-                   const matches = ancestorElement.querySelectorAll(scopedSingleClassSelector);
-                   if (matches.length === 1 && matches[0] === element) {
-                       relativeSelector = scopedSingleClassSelector;
-                       break; // Found one
-                   }
-               } catch(e) { /* ignore invalid selectors */ }
-           }
+                 const simpleMatches = ancestorEl.querySelectorAll(simpleClassSelector);
+                 if (simpleMatches.length === 1 && simpleMatches[0] === targetEl) return simpleClassSelector;
+               } catch(e) { /* ignore */ }
+            }
+          }
+
+          // 4. Positional Fallback: :nth-of-type
+          //    Calculate the index among siblings of the same tag name
+          let index = -1;
+          const siblingsOfType = Array.from(ancestorEl.children).filter(child => child.tagName === targetEl.tagName);
+          for(let i = 0; i < siblingsOfType.length; i++) {
+              if (siblingsOfType[i] === targetEl) {
+                  index = i + 1; // CSS :nth-of-type is 1-based
+                  break;
+              }
+          }
+          if (index > 0) {
+              const candidateSelector = `${targetTagName}:nth-of-type(${index})`;
+              try {
+                  // Verify this selector actually selects the target element within the ancestor
+                  const match = ancestorEl.querySelector(candidateSelector);
+                  if (match === targetEl) {
+                      // Double check uniqueness just in case querySelector picked the first of multiple matches somehow (unlikely but safe)
+                       const matches = ancestorEl.querySelectorAll(candidateSelector);
+                       if (matches.length === 1) return candidateSelector;
+                  }
+              } catch(e) { /* ignore */ }
+          }
+
+          return null; // No unique relative selector found
         }
 
+        relativeSelector = findRelativeSelector(element, ancestorElement);
+        // --- END: Refactored Relative Selector Search ---
 
         // If we found a unique relative selector for the target within this unique ancestor
         if (relativeSelector) {
