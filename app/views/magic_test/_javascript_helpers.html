@@ -317,11 +317,17 @@
   function clickFunction(event) {
     // --- START: Debounce Check ---
     const now = Date.now();
-    if (now - lastClickTimestamp < CLICK_DEBOUNCE_MS) {
-        console.log(`[MagicTest Debug] Debouncing click event (target: ${event.target.id || event.target.tagName}). Time since last: ${now - lastClickTimestamp}ms.`);
-        // Optional: More specific check - if the debounced target is the known submit button?
-        // if (event.target.id === 'submit-button') { ... }
-        return; // Ignore this click, likely triggered programmatically
+    const timeSinceLastClick = now - lastClickTimestamp;
+    // --- Add detailed log BEFORE the check ---
+    console.log(`[MagicTest Debug] Debounce Check Start: Target=${event.target.outerHTML}, Now=${now}, LastClick=${lastClickTimestamp}, Diff=${timeSinceLastClick}, Threshold=${CLICK_DEBOUNCE_MS}`);
+    // ---------------------------------------
+    // Check if this click occurred too quickly after the previous one
+    if (timeSinceLastClick < CLICK_DEBOUNCE_MS) {
+        // --- Ensure log inside identifies the element being debounced ---
+        // console.log(`[MagicTest Debug] Debouncing click event (target: ${event.target.id || event.target.tagName}). Time since last: ${timeSinceLastClick}ms.`);
+        console.log(`[MagicTest Debug] Debouncing click event for: ${event.target.outerHTML} (timeDiff ${timeSinceLastClick}ms < ${CLICK_DEBOUNCE_MS}ms)`); // More specific log
+        // -----------------------------------------------------------
+        return; // Ignore this click event entirely
     }
     // --- END: Debounce Check ---
 
@@ -473,15 +479,19 @@
 
     // Record the determined action if found
     if (recordedData) {
-        console.log("[MagicTest Debug] Recording data:", recordedData);
+        // --- Add log identifying recorded element's original target if possible ---
+        // (recordedData doesn't directly store the original element, but we can log what was decided)
+        console.log(`[MagicTest Debug] Recording data (processed from element: ${element.outerHTML}):`, recordedData);
+        // ------------------------------------------------------------------------
         var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
         testingOutput.push(recordedData);
         sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
         // --- START: Update last click timestamp AFTER recording ---
         lastClickTimestamp = now;
+        console.log(`[MagicTest Debug] Updated lastClickTimestamp to: ${lastClickTimestamp}`); // Log timestamp update
         // --- END: Update last click timestamp ---
     } else {
-        console.log("[MagicTest Debug] No data recorded for this click.");
+        console.log(`[MagicTest Debug] No data recorded for this click (processed from element: ${element.outerHTML}).`);
     }
   };
 
