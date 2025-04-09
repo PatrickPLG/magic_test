@@ -136,8 +136,12 @@ module MagicTest
       @test_lines_written = 0
       begin
         magic_test_pry_hook
+        puts "[MagicTest Ruby Debug] Explicitly calling empty_cache right before pry."
+        empty_cache
         binding.pry
-      rescue
+      rescue => e
+        puts "[MagicTest Ruby Debug] Error during magic_test setup/pry: #{e.message}"
+        puts e.backtrace.join("\n")
         retry
       end
     end
