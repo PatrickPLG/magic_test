@@ -66,9 +66,18 @@ module MagicTest
             generated_code = "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
           when "magic_choose_search"
             original_select_id = event_data["target"]
-            search_text = event_data["options"].to_s.gsub("'", "\\\\'")
+            search_text = event_data["options"].to_s.gsub("'", "\\\'")
             chosen_container_selector = "'##{original_select_id}_chosen'"
             generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
+          when "find"
+            target = event_data["target"]
+            options = event_data["options"]
+            if options&.start_with?(".")
+              generated_code = "find(#{target})#{options}"
+            else
+              puts "WARN: MagicTest encountered 'find' action without a chained method (.click, .set, etc.): #{event_data.inspect}"
+              generated_code = "find(#{target})"
+            end
           else
             action = event_data["action"]
             target = event_data["target"]
