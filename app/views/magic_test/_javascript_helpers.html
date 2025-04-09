@@ -136,7 +136,7 @@
               siblings.forEach(sibling => {
                  if(sibling.classList.contains(targetCls)) { // Only compare siblings with the same primary class
                     Array.from(sibling.classList).forEach(siblingCls => {
-                        if (semanticClasses.includes(siblingCls) && !targetEl.classList.contains(siblingCls)) {
+                        if (!BOOTSTRAP_CLASS_REGEX.test(siblingCls) && !targetEl.classList.contains(siblingCls)) {
                            if (!missingClasses.includes(siblingCls)) missingClasses.push(siblingCls);
                         }
                     });
