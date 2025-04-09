@@ -315,7 +315,15 @@
   // --- END: Debounce logic variables ---
 
   function clickFunction(event) {
-    // --- START: Debounce Check ---
+    // --- START: Filter non-trusted events ---
+    // Ignore clicks not directly initiated by the user (e.g., element.click())
+    if (!event.isTrusted) {
+        console.log(`[MagicTest Debug] Ignoring non-trusted click event for: ${event.target.outerHTML}`);
+        return;
+    }
+    // --- END: Filter non-trusted events ---
+
+    // --- START: Debounce Check (Keep for rapid USER clicks, if needed) ---
     const now = Date.now();
     const timeSinceLastClick = now - lastClickTimestamp;
     // --- Add detailed log BEFORE the check ---
