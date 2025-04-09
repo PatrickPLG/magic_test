@@ -23,15 +23,12 @@ module MagicTest
 
     def flush
       filepath, line = get_last_caller(caller)
-      puts "[MagicTest Ruby Debug] Flush command started." # Log start
 
       # Step 1: Read current storage
       raw_output_json = page.evaluate_script("sessionStorage.getItem('testingOutput')")
-      puts "[MagicTest Ruby Debug] Read from sessionStorage: #{raw_output_json.inspect}" # Log content read
 
       # Step 2: Clear storage immediately
-      empty_cache # This call now includes logging
-      puts "[MagicTest Ruby Debug] Called immediate empty_cache after reading." # Log immediate clear
+      empty_cache
 
       contents = File.open(filepath).read.lines
       slice_point = line.to_i - 1 + @test_lines_written
@@ -54,13 +51,7 @@ module MagicTest
       end
 
       # Step 3: Process the data that was read *before* clearing
-      # output = page.evaluate_script("JSON.parse(sessionStorage.getItem('testingOutput') || '[]')") # OLD position
       output = JSON.parse(raw_output_json || '[]') # Parse the stored JSON
-      puts "[MagicTest Ruby Debug] Processing output: #{output.inspect}"
-      # puts
-      # puts "javascript recorded on the front-end looks like this:"
-      # puts output.inspect # Keep original logging commented for now
-      # puts
       puts "(writing generated Capybara steps to `#{filepath}`.)"
 
       if output && !output.empty?
@@ -96,11 +87,7 @@ module MagicTest
         File.open(filepath, "w") do |file|
           file.puts(contents)
         end
-        empty_cache # Step 4: Keep final clear for safety (includes logging)
-        puts "[MagicTest Ruby Debug] Called final empty_cache after writing."
-      else
-        # puts "`sessionStorage['testingOutput']` was empty or null in the browser. No actions recorded or flushed." # Original message
-        puts "[MagicTest Ruby Debug] No output to process (sessionStorage was empty or invalid JSON before immediate clear)."
+        empty_cache # Step 4: Keep final clear for safety
       end
       true
     end
@@ -124,7 +111,6 @@ module MagicTest
     end
 
     def empty_cache
-      puts "[MagicTest Ruby Debug] empty_cache method called." # Add log here too
       page.evaluate_script("sessionStorage.setItem('testingOutput', JSON.stringify([]))")
     rescue Capybara::NotSupportedByDriverError => _
       raise "You need to configure this test (or your test suite) to run in a real browser (Chrome, Firefox, etc.) in order for Magic Test to work. It also needs to run in non-headless mode if `ENV['MAGIC_TEST'].present?`"
@@ -136,11 +122,9 @@ module MagicTest
       @test_lines_written = 0
       begin
         magic_test_pry_hook
-        puts "[MagicTest Ruby Debug] Explicitly calling empty_cache right before pry."
         empty_cache
         binding.pry
       rescue => e
-        puts "[MagicTest Ruby Debug] Error during magic_test setup/pry: #{e.message}"
         puts e.backtrace.join("\n")
         retry
       end
