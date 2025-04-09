@@ -26,18 +26,56 @@ module MagicTest
 
       contents = File.open(filepath).read.lines
       chunks = contents.each_slice(line.to_i - 1 + @test_lines_written).to_a
-      indentation = chunks[1].first.match(/^(\s*)/)[0]
-      output = page.evaluate_script("JSON.parse(sessionStorage.getItem('testingOutput'))")
+      indentation = chunks[1].first.match(/^(\\s*)/)[0]
+      # Retrieve events recorded by the JavaScript listeners
+      output = page.evaluate_script("JSON.parse(sessionStorage.getItem('testingOutput') || '[]')") # Ensure default empty array if null
       puts
       puts "javascript recorded on the front-end looks like this:"
-      puts output
+      # Use inspect for clearer representation of the array of hashes
+      puts output.inspect
       puts
-      puts "(writing that to `#{filepath}`.)"
-      if output
-        output.each do |last|
-          chunks.first << indentation + "#{last["action"]} #{last["target"]}#{last["options"]}" + "\n"
-          @test_lines_written += 1
+      puts "(writing generated Capybara steps to `#{filepath}`.)"
+
+      if output && !output.empty? # Check if output is not nil and not empty
+        output.each do |event_data|
+          generated_code = ""
+          # Process events based on the recorded action
+          case event_data["action"]
+          when "magic_choose_open"
+            # Assumes the chosen container ID is derived from the original select ID
+            original_select_id = event_data["target"] # Expecting original select ID/name here
+            chosen_container_selector = "'##{original_select_id}_chosen'" # Using ID selector pattern
+            # Alternative using label text if ID isn't reliable:
+            # find("label", text: original_select_label).find(:xpath, "./following-sibling::div[contains(@class, 'chosen-container')]")
+            generated_code = "find(#{chosen_container_selector}).click"
+          when "magic_choose_select"
+            original_select_id = event_data["target"]
+            option_text = event_data["options"].to_s.gsub("'", "\\\\'") # Escape single quotes in option text
+            chosen_container_selector = "'##{original_select_id}_chosen'"
+            generated_code = "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
+            # Alternative for multi-select (might need separate action later):
+            # find(#{chosen_container_selector}).find('ul.chosen-choices li.search-choice span', text: '#{option_text}')...
+          when "magic_choose_search"
+            original_select_id = event_data["target"]
+            search_text = event_data["options"].to_s.gsub("'", "\\\\'") # Escape single quotes
+            chosen_container_selector = "'##{original_select_id}_chosen'"
+            generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
+          else
+            # Default handler for existing actions (click_on, fill_in, etc.)
+            action = event_data["action"]
+            target = event_data["target"]
+            options = event_data["options"]
+            # Ensure target and options are not nil before concatenating
+            generated_code = "#{action} #{target}#{options}"
+          end
+
+          # Add the generated line to the test file
+          unless generated_code.empty?
+            chunks.first << indentation + generated_code + "\\n"
+            @test_lines_written += 1
+          end
         end
+
         contents = chunks.flatten.join
         File.open(filepath, "w") do |file|
           file.puts(contents)
@@ -45,7 +83,7 @@ module MagicTest
         # clear the testing output now.
         empty_cache
       else
-        puts "`window.testingOutput` was empty in the browser. Something must be wrong on the browser side."
+        puts "`sessionStorage['testingOutput']` was empty or null in the browser. No actions recorded or flushed."
       end
       true
     end

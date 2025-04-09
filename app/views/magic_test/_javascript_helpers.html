@@ -6,52 +6,149 @@
     initializeMutationObserver();
   });
 
-  function clickFunction(event) {
-    var element = event.target
-    var tagName = element.tagName
-    var action = ""
-    var target = ""
-    var options = ""
-    if (tagName == "BUTTON" || tagName == "A" || (tagName == "INPUT" && element.type == 'submit')) {
-      action = "click_on"
-      target = element.value || element.text
-      if (!target) {
-        return;
-      }
-      target = "\'" + target.trim().replace("'", "\\\'") + "\'"
-    } else if (tagName == "INPUT") {
-      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search']
-      if (ignoreType.includes(element.type)) {
-        return;
-      }
-      var path = getPathTo(element)
-      action = `find(:xpath, '${path}').click`
-    } else {
-      return;
+  // Helper to get the original select ID from a chosen container element
+  function getOriginalSelectId(chosenElement) {
+    const container = chosenElement.closest('div.chosen-container');
+    if (container && container.id && container.id.endsWith('_chosen')) {
+      return container.id.substring(0, container.id.length - '_chosen'.length);
     }
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    return null;
+  }
+
+  function clickFunction(event) {
+    var element = event.target;
+    var tagName = element.tagName;
+    var action = "";
+    var target = "";
+    var options = "";
+
+    // --- Chosen.js Handling --- START
+    const chosenContainer = element.closest('div.chosen-container');
+    if (chosenContainer) {
+      const originalSelectId = getOriginalSelectId(chosenContainer);
+      if (!originalSelectId) return; // Could not map back, ignore
+
+      // Case 1: Click to open the dropdown (on the container or the single selection link)
+      if (element.matches('a.chosen-single, div.chosen-container') || element.closest('a.chosen-single')) {
+        action = "magic_choose_open";
+        target = originalSelectId; // Use original select ID
+        options = "";
+      }
+      // Case 2: Click to select an option from the results list
+      else if (element.matches('ul.chosen-results li')) {
+        action = "magic_choose_select";
+        target = originalSelectId; // Use original select ID
+        options = element.textContent || element.innerText; // Get the selected option's text
+        // Handle potential deselection in multi-select (may need refinement)
+      } else if (element.matches('ul.chosen-choices li.search-choice a.search-choice-close')) {
+        // TODO: Add handling for deselecting in multi-select if needed
+        // action = "magic_choose_deselect";
+        // target = originalSelectId;
+        // options = element.parentElement.querySelector('span').textContent;
+        console.log("MagicTest: Chosen multi-select deselect detected but not yet handled.");
+        return; // For now, don't record deselection
+      } else {
+        return; // Click inside chosen, but not on a recognized interactive element
+      }
+
+      // Record the custom chosen action
+      var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+      testingOutput.push({action: action, target: target, options: options });
+      sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+      return; // Prevent default click handling below
+    }
+    // --- Chosen.js Handling --- END
+
+    // Default handling for non-chosen elements
+    if (tagName == "BUTTON" || tagName == "A" || (tagName == "INPUT" && element.type == 'submit')) {
+      action = "click_on";
+      target = element.value || element.textContent || element.innerText; // Use textContent/innerText as fallback
+      if (!target) {
+        // Attempt to find a target using aria-label or title if standard text/value fails
+        target = element.getAttribute('aria-label') || element.getAttribute('title');
+        if (!target) return; // Still no target, ignore click
+      }
+      target = "\'" + target.trim().replace("'", "\\\'") + "\'";
+    } else if (tagName == "INPUT") {
+      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local'];
+      if (ignoreType.includes(element.type)) {
+        return; // Ignore clicks that are just focusing text-like inputs
+      }
+      var path = getPathTo(element);
+      action = `find(:xpath, '${path}').click`;
+      target = ""; // No target needed for xpath click
+      options = "";
+    } else {
+      // Maybe it's a label or some other clickable element? Try xpath.
+      var path = getPathTo(element);
+      if (path) {
+         action = `find(:xpath, '${path}').click`;
+         target = "";
+         options = "";
+      } else {
+         return; // Cannot determine a reliable way to record this click
+      }
+    }
+    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     testingOutput.push({action: action, target: target, options: options });
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   };
 
   function keypressFunction(evt) {
     evt = evt || window.event;
+    var element = evt.target;
+
+    // --- Chosen.js Handling --- START
+    if (element.matches('input.chosen-search-input')) {
+      const originalSelectId = getOriginalSelectId(element);
+      if (!originalSelectId) return; // Cannot map back
+
+      var charCode = evt.keyCode || evt.which;
+      var charStr = String.fromCharCode(charCode);
+      var searchText = (element.value + charStr).trim().replace("'", "\\\'"); // Append char and trim
+
+      var action = "magic_choose_search";
+      var target = originalSelectId;
+      var options = searchText;
+
+      var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+      var lastAction = testingOutput[testingOutput.length - 1];
+
+      // If the last action was also a search on the same chosen input, update it
+      if (lastAction && lastAction.action == action && lastAction.target == target) {
+        lastAction.options = options;
+      } else {
+        testingOutput.push({action: action, target: target, options: options});
+      }
+      sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+      return; // Prevent default keypress handling
+    }
+    // --- Chosen.js Handling --- END
+
+    // Default handling for standard inputs
     var charCode = evt.keyCode || evt.which;
     var charStr = String.fromCharCode(charCode);
-    if (!evt.target.labels) {
+    if (!evt.target.labels || evt.target.labels.length === 0) { // Check if labels exist
+      // Handle inputs without labels (e.g., use placeholder or name as fallback?)
+      // For now, just return to avoid errors.
+      // console.log("MagicTest: Keypress on element without labels, ignored.", evt.target);
       return;
     }
     var label = evt.target.labels[0].textContent;
     var text = (evt.target.value + charStr).trim().replace("'", "\\\'");
     var action = "fill_in";
-    var target = evt.target.labels[0].textContent;
+    // Use label text or fall back to input name/id if label is empty
+    var targetIdentifier = label || evt.target.name || evt.target.id;
+    if (!targetIdentifier) return; // Cannot identify the input field
+
+    var target = "\'" + targetIdentifier.trim().replace("'", "\\\'") + "\'";
     var options = ", with: '" + text + "'";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     var lastAction = testingOutput[testingOutput.length - 1];
-    if (lastAction && lastAction.action == action && lastAction.target == "\'" + target + "\'") {
+    if (lastAction && lastAction.action == action && lastAction.target == target) {
       lastAction.options = options;
     } else {
-      testingOutput.push({action: action, target: "\'" + target + "\'", options: options});
+      testingOutput.push({action: action, target: target, options: options});
     }
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   }
@@ -73,7 +170,7 @@
       target = `send_keys('${letter}')`;
     }
     var options = "";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     var lastAction = testingOutput[testingOutput.length - 1];
     // If the last key pressed was enter, always start a new action (otherwise with trix mentions, it happens too fast and we don't actually select the mentioned user correctly.)
     if (lastAction && lastAction.target.substr(lastAction.target.length - 7 , 6) == ":enter") {
@@ -116,7 +213,7 @@
       target = `send_keys('${letter}')`;
     }
     var options = "";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     var lastAction = testingOutput[testingOutput.length - 1];
     if (lastAction && lastAction.action == action && lastAction.target.substr(0,9) == 'send_keys') {
       if (charStr) {
