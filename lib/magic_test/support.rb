@@ -25,53 +25,59 @@ module MagicTest
       filepath, line = get_last_caller(caller)
 
       contents = File.open(filepath).read.lines
-      chunks = contents.each_slice(line.to_i - 1 + @test_lines_written).to_a
-      indentation = chunks[1].first.match(/^(\\s*)/)[0]
-      # Retrieve events recorded by the JavaScript listeners
-      output = page.evaluate_script("JSON.parse(sessionStorage.getItem('testingOutput') || '[]')") # Ensure default empty array if null
+      slice_point = line.to_i - 1 + @test_lines_written
+      chunks = contents.each_slice(slice_point).to_a
+
+      line_after_magic_test = chunks.dig(1, 0)
+
+      if line_after_magic_test
+        indentation_match = line_after_magic_test.match(/^(\s*)/)
+        indentation = indentation_match ? indentation_match[0] : "  "
+      else
+        magic_test_line_index = line.to_i - 1
+        if magic_test_line_index >= 0 && contents[magic_test_line_index]
+           magic_test_line_indentation_match = contents[magic_test_line_index].match(/^(\s*)/)
+           magic_test_line_indentation = magic_test_line_indentation_match ? magic_test_line_indentation_match[0] : ""
+           indentation = magic_test_line_indentation + "  "
+        else
+           indentation = "  "
+        end
+      end
+
+      output = page.evaluate_script("JSON.parse(sessionStorage.getItem('testingOutput') || '[]')")
       puts
       puts "javascript recorded on the front-end looks like this:"
-      # Use inspect for clearer representation of the array of hashes
       puts output.inspect
       puts
       puts "(writing generated Capybara steps to `#{filepath}`.)"
 
-      if output && !output.empty? # Check if output is not nil and not empty
+      if output && !output.empty?
         output.each do |event_data|
           generated_code = ""
-          # Process events based on the recorded action
           case event_data["action"]
           when "magic_choose_open"
-            # Assumes the chosen container ID is derived from the original select ID
-            original_select_id = event_data["target"] # Expecting original select ID/name here
-            chosen_container_selector = "'##{original_select_id}_chosen'" # Using ID selector pattern
-            # Alternative using label text if ID isn't reliable:
-            # find("label", text: original_select_label).find(:xpath, "./following-sibling::div[contains(@class, 'chosen-container')]")
+            original_select_id = event_data["target"]
+            chosen_container_selector = "'##{original_select_id}_chosen'"
             generated_code = "find(#{chosen_container_selector}).click"
           when "magic_choose_select"
             original_select_id = event_data["target"]
-            option_text = event_data["options"].to_s.gsub("'", "\\\\'") # Escape single quotes in option text
+            option_text = event_data["options"].to_s.gsub("'", "\\\\'")
             chosen_container_selector = "'##{original_select_id}_chosen'"
             generated_code = "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
-            # Alternative for multi-select (might need separate action later):
-            # find(#{chosen_container_selector}).find('ul.chosen-choices li.search-choice span', text: '#{option_text}')...
           when "magic_choose_search"
             original_select_id = event_data["target"]
-            search_text = event_data["options"].to_s.gsub("'", "\\\\'") # Escape single quotes
+            search_text = event_data["options"].to_s.gsub("'", "\\\\'")
             chosen_container_selector = "'##{original_select_id}_chosen'"
             generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
           else
-            # Default handler for existing actions (click_on, fill_in, etc.)
             action = event_data["action"]
             target = event_data["target"]
             options = event_data["options"]
-            # Ensure target and options are not nil before concatenating
             generated_code = "#{action} #{target}#{options}"
           end
 
-          # Add the generated line to the test file
           unless generated_code.empty?
-            chunks.first << indentation + generated_code + "\\n"
+            chunks.first << indentation + generated_code + "\n"
             @test_lines_written += 1
           end
         end
@@ -80,7 +86,6 @@ module MagicTest
         File.open(filepath, "w") do |file|
           file.puts(contents)
         end
-        # clear the testing output now.
         empty_cache
       else
         puts "`sessionStorage['testingOutput']` was empty or null in the browser. No actions recorded or flushed."
@@ -109,7 +114,6 @@ module MagicTest
     def empty_cache
       page.evaluate_script("sessionStorage.setItem('testingOutput', JSON.stringify([]))")
     rescue Capybara::NotSupportedByDriverError => _
-      # TODO we need to add more robust instructions for this.
       raise "You need to configure this test (or your test suite) to run in a real browser (Chrome, Firefox, etc.) in order for Magic Test to work. It also needs to run in non-headless mode if `ENV['MAGIC_TEST'].present?`"
     end
 
@@ -131,7 +135,6 @@ module MagicTest
       Pry.hooks.add_hook(:before_session, "magic_test") do |output, binding, pry|
         Pry.hooks.delete_hook(:before_session, 'magic_test')
         magic_test_file_index = pry.backtrace.index{|line| line.include?(__FILE__)}
-        # walk up backtrace until finding the original caller
         until pry.backtrace[magic_test_file_index + 1].include?(pry.last_file) do
           pry.run_command('up')
         end
@@ -155,7 +158,6 @@ module MagicTest
       last_block
     end
 
-    # TODO this feels like it's going to end up burning people who have other support files in `test` or `spec` that don't include `helper` in the name.
     def get_last_caller(caller)
       caller.select { |s| s.include?("/test/") || s.include?("/spec/") }
         .reject { |s| s.include?("helper") }
