@@ -251,9 +251,10 @@ module MagicTest
         # JS provides target="'selector'", options=""
         code << "#{base_indentation}find(#{target}).hover" # Target includes quotes
       when 'magic_choose'
-        # Format: choose 'Label Text'
+        # Format: choose 'Label Text', allow_label_click: true
         # JS provides target="'Label Text'", options=""
-        code << "#{base_indentation}choose(#{target})" # Target includes quotes
+        # We add allow_label_click because the JS recorder often triggers via label/wrapper clicks.
+        code << "#{base_indentation}choose(#{target}, allow_label_click: true)"
       # --- Chosen.js Specific Actions ---
       when 'magic_choose_open'
         # This only runs if it wasn't skipped by the lookahead in flush

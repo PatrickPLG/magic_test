@@ -475,7 +475,7 @@
     // --- Chosen.js Handling --- START
     const chosenContainer = element.closest('div.chosen-container');
     if (chosenContainer) {
-        const originalSelectId = getOriginalSelectId(chosenContainer);
+      const originalSelectId = getOriginalSelectId(chosenContainer);
         if (!originalSelectId) { return; }
 
         let chosenAction = null;
@@ -517,15 +517,15 @@
             chosenAction = "magic_choose_open";
         } else if (isSearchInput) {
             return;
-        } else {
+      } else {
             return;
-        }
+      }
 
         if (chosenAction) {
           const eventDataToRecord = {action: chosenAction, target: chosenTarget, options: chosenOptions };
-          var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+      var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
           testingOutput.push(eventDataToRecord);
-          sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+      sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
           lastClickTimestamp = Date.now();
         }
         return;
@@ -569,7 +569,7 @@
     // Priority 2: Other Input Types (Clicks on checkbox, radio etc.)
     else if (tagName == "INPUT") {
         let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search', 'tel', 'url', 'week', 'time', 'datetime-local', 'color', 'range', 'file'];
-        if (ignoreType.includes(element.type)) {
+      if (ignoreType.includes(element.type)) {
           return;
         }
 
@@ -588,7 +588,7 @@
                 target: `'${selectorResult.targetSelector.replace(/\'/g, "\\\'")}'`, // Escaped relative target selector
                 options: ".click"
             };
-        } else {
+    } else {
            console.warn("MagicTest: Could not find suitable selector for input:", element);
         }
     }
@@ -609,16 +609,16 @@
                 target: `'${selectorResult.targetSelector.replace(/\'/g, "\\\'")}'`, // Escaped relative target selector
                 options: ".click"
             };
-        } else {
+      } else {
            console.warn("MagicTest: Could not find suitable selector for generic element:", element);
-        }
+      }
     }
 
     // Record the determined action if found
     if (recordedData) {
-        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
         testingOutput.push(recordedData);
-        sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+    sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
         lastClickTimestamp = now;
     }
   };
@@ -734,8 +734,8 @@
 
 
     if (recordedData) {
-        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-        var lastAction = testingOutput[testingOutput.length - 1];
+    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+    var lastAction = testingOutput[testingOutput.length - 1];
 
         // --- START: Aggregation Logic Refinement (Needs careful check) ---
         // Check if last action can be aggregated. Criteria:
