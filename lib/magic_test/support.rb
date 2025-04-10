@@ -22,19 +22,34 @@ module MagicTest
     end
 
     def flush
-      filepath, line = get_last_caller(caller)
+      # --- Add logging for file/line --- #
+      caller_info = get_last_caller(caller)
+      filepath = caller_info[0]
+      line = caller_info[1]
+      puts "[MagicTest Ruby Debug] Flush target: File=#{filepath}, Line=#{line}" # Log File/Line
+      # --------------------------------- #
+      puts "[MagicTest Ruby Debug] Flush command started."
 
-      # Step 1: Read current storage
       raw_output_json = page.evaluate_script("sessionStorage.getItem('testingOutput')")
+      # puts "[MagicTest Ruby Debug] Read from sessionStorage: #{raw_output_json.inspect}" # Keep this less verbose for now
 
-      # Step 2: Clear storage immediately
       empty_cache
+      puts "[MagicTest Ruby Debug] Called immediate empty_cache after reading."
 
       contents = File.open(filepath).read.lines
-      slice_point = line.to_i - 1 + @test_lines_written
-      chunks = contents.each_slice(slice_point).to_a
+      initial_lines_written_count = @test_lines_written
 
-      line_after_magic_test = chunks.dig(1, 0)
+      # --- Add logging for slice point --- #
+      current_slice_point = line.to_i - 1 + initial_lines_written_count
+      puts "[MagicTest Ruby Debug] Slice Calculation: line(#{line}) - 1 + initial_lines(#{initial_lines_written_count}) = SlicePoint(#{current_slice_point})"
+      # ---------------------------------- #
+
+      current_chunks = contents.each_slice(current_slice_point).to_a
+      # --- Add logging for chunks --- #
+      puts "[MagicTest Ruby Debug] Created #{current_chunks.size} chunk(s). First chunk size: #{current_chunks[0]&.size || 0}"
+      # ----------------------------- #
+
+      line_after_magic_test = current_chunks.dig(1, 0)
 
       if line_after_magic_test
         indentation_match = line_after_magic_test.match(/^(\s*)/)
@@ -52,6 +67,7 @@ module MagicTest
 
       # Step 3: Process the data that was read *before* clearing
       output = JSON.parse(raw_output_json || '[]') # Parse the stored JSON
+      puts "[MagicTest Ruby Debug] Processing output: #{output.inspect}"
       puts "(writing generated Capybara steps to `#{filepath}`.)"
 
       if output && !output.empty?
@@ -102,11 +118,31 @@ module MagicTest
           end
         end
 
-        contents = chunks.flatten.join
-        File.open(filepath, "w") do |file|
-          file.puts(contents)
+        if lines_to_add.any?
+             puts "[MagicTest Ruby Debug] Adding #{lines_to_add.count} line(s) to the file."
+             # current_slice_point = line.to_i - 1 + initial_lines_written_count # Moved up
+             # current_chunks = contents.each_slice(current_slice_point).to_a # Moved up
+             current_chunks[0] = [] unless current_chunks[0]
+             current_chunks.first.concat(lines_to_add.map { |l| l + "\n" })
+
+             contents_string = current_chunks.flatten.join
+             # --- Add logging for final content --- #
+             puts "[MagicTest Ruby Debug] ===== Final Content to Write START ====="
+             puts contents_string # Log the exact string being written
+             puts "[MagicTest Ruby Debug] ===== Final Content to Write END ====="
+             # ------------------------------------ #
+             File.open(filepath, "w") do |file|
+                 file.puts(contents_string) # Use puts to add trailing newline
+             end
+             puts "[MagicTest Ruby Debug] File write operation completed."
+        else
+             puts "[MagicTest Ruby Debug] No new lines generated to add to the file."
         end
-        empty_cache # Step 4: Keep final clear for safety
+
+        empty_cache
+        puts "[MagicTest Ruby Debug] Called final empty_cache after processing/writing."
+      else
+        puts "[MagicTest Ruby Debug] No output to process (sessionStorage was empty or invalid JSON before immediate clear)."
       end
       true
     end
