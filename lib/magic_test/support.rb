@@ -267,18 +267,35 @@ module MagicTest
 
       case action
       when 'fill_in'
-        code << "#{base_indentation}fill_in '#{target}', with: '#{options}'"
+        # Format: fill_in 'label_or_id', with: 'value'
+        # JS provides target='label_or_id', options='value'
+        code << "#{base_indentation}fill_in #{target}, with: '#{options}'" # Target needs quotes from JS
         # puts "[MagicTest Ruby Debug] Generating fill_in."
       when 'click_on'
-        code << "#{base_indentation}click_on #{target}" # Target should include quotes if it's a string
+        # Format: click_on 'button_link_or_text'
+        # JS provides target="'text'", options=""
+        code << "#{base_indentation}click_on #{target}" # Target already has quotes from JS
         # puts "[MagicTest Ruby Debug] Generating click_on."
-      when 'click'
-         code << "#{base_indentation}find('#{target}').click" # Assuming target is an ID selector
+      # --- START: Fix FIND Action ---
+      when 'find'
+        # Format: find('selector').action_or_chain
+        # JS provides target="'selector'", options=".click" or ".send_keys(...)"
+        code << "#{base_indentation}find(#{target})#{options}" # Target has quotes, options has method call
+        # puts "[MagicTest Ruby Debug] Generating find action."
+      # --- END: Fix FIND Action ---
+      when 'click' # NOTE: This case might be obsolete if JS always uses find+click or click_on?
+         # Keep for now, maybe it's used somewhere?
+         # Assumes target is ID/selector that doesn't need quotes
+         code << "#{base_indentation}find('#{target}').click"
          # puts "[MagicTest Ruby Debug] Generating click."
       when 'select'
-        code << "#{base_indentation}select '#{options}', from: '#{target}'"
+        # Format: select 'option_text', from: 'label_or_id'
+        # JS provides target='label_or_id', options='option_text'
+        code << "#{base_indentation}select '#{options}', from: #{target}" # Target needs quotes from JS
         # puts "[MagicTest Ruby Debug] Generating select."
       when 'magic_hover'
+        # Format: find('selector').hover
+        # JS provides target="'selector'", options=""
         code << "#{base_indentation}find(#{target}).hover" # Target includes quotes from JS
       # --- Chosen.js Specific Actions ---
       when 'magic_choose_open'

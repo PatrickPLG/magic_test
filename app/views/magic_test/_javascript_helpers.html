@@ -272,28 +272,44 @@
 
   // --- START: New Hover Listener ---
   function mouseoverFunction(evt) {
+    console.log("MagicTest: mouseoverFunction entered");
     // Clear any existing debounce timer
     clearTimeout(hoverTimeoutId);
 
     const element = evt.target;
-    console.log("[MagicTest Hover Debug] Mouseover initial element:", element);
+    // console.log("[MagicTest Hover Debug] Mouseover initial element:", element);
 
     // Basic filtering
     if (!element || element === document.body || element === document.documentElement) {
+      console.log("MagicTest: mouseoverFunction exiting early (basic filter)");
       return;
     }
 
     // --- Element Handling (similar to click) ---
     let targetElement = element;
-    if (element.tagName === 'path' || element.closest('svg')) {
-        targetElement = element.closest('svg');
-        if (!targetElement) return;
+    try {
+      if (element.tagName === 'path' || element.closest('svg')) {
+          targetElement = element.closest('svg');
+          if (!targetElement) {
+             console.log("MagicTest: mouseoverFunction exiting (could not find parent SVG)");
+             return;
+          }
+      }
+    } catch (e) {
+        console.error("MagicTest: Error during hover element handling:", e, "Initial element:", element);
+        return; // Exit if error occurs
     }
-    console.log("[MagicTest Hover Debug] Target element after SVG check:", targetElement);
+    // console.log("[MagicTest Hover Debug] Target element after SVG check:", targetElement);
 
     // --- START: Enhanced Heuristic Setup ---
-    const parentElementLi = targetElement.closest('li'); // Find parent LI if it exists
-    console.log("[MagicTest Hover Debug] Parent LI found:", parentElementLi);
+    let parentElementLi = null;
+    try {
+        parentElementLi = targetElement.closest('li'); // Find parent LI if it exists
+    } catch (e) {
+        console.error("MagicTest: Error finding parent LI:", e, "Target element:", targetElement);
+        // Continue without parent LI check if lookup fails
+    }
+    // console.log("[MagicTest Hover Debug] Parent LI found:", parentElementLi);
 
     // Capture initial visibility state of direct children
     const initialChildVisibility = {};
