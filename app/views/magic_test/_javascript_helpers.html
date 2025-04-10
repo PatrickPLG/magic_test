@@ -779,16 +779,84 @@
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   }
 
+  // Mutation Observer logic
+  let mutationObserver = undefined;
+  let observedMutations = [];
+  let mutationTimer = null;
+  const MUTATION_DEBOUNCE_MS = 150;
+
+  function initializeMutationObserver() {
+    console.log("MagicTest: initializeMutationObserver called"); // ADDED: Log entry
+    if (typeof MutationObserver === 'undefined') {
+        console.warn("MagicTest: MutationObserver not supported by this browser.");
+        return;
+    }
+    try {
+        mutationObserver = new MutationObserver(mutations => {
+            observedMutations.push(...mutations);
+            clearTimeout(mutationTimer);
+            mutationTimer = setTimeout(processMutations, MUTATION_DEBOUNCE_MS);
+        });
+        console.log("MagicTest: MutationObserver initialized successfully:", mutationObserver); // ADDED: Log success
+    } catch (e) {
+        console.error("MagicTest: Error initializing MutationObserver:", e);
+        mutationObserver = undefined; // Ensure it's undefined on error
+    }
+  }
+
+  function processMutations() {
+      // ... (existing processMutations logic)
+  }
+
+  function mutationStart(element) {
+      if (!mutationObserver) {
+          console.error("MagicTest: mutationStart called but mutationObserver is not initialized!"); // ADDED: Check before use
+          return; // Avoid error if not initialized
+      }
+      console.log("MagicTest: mutationStart called. Observer state:", mutationObserver); // ADDED: Log state before use
+      try {
+          mutationObserver.observe(element || document.body, { childList: true, subtree: true, attributes: true });
+      } catch (e) {
+          console.error("MagicTest: Error starting MutationObserver observation:", e);
+      }
+  }
+
+  function mutationEnd() {
+      if (!mutationObserver) {
+          console.error("MagicTest: mutationEnd called but mutationObserver is not initialized!"); // ADDED: Check before use
+          return; // Avoid error if not initialized
+      }
+      console.log("MagicTest: mutationEnd called. Observer state:", mutationObserver); // ADDED: Log state before use
+      try {
+          mutationObserver.disconnect();
+          processMutations(); // Process any remaining mutations immediately
+          observedMutations = []; // Clear buffer
+      } catch (e) {
+          console.error("MagicTest: Error disconnecting MutationObserver:", e);
+      }
+  }
+  // --- END Mutation Observer logic ---
+
   function addListeners() {
+    console.log("MagicTest: addListeners function entered."); // ADDED: Log entry
     document.addEventListener('click', clickFunction, true);
     document.addEventListener('keypress', keypressFunction, true);
     document.addEventListener('keydown', keyDownFunction, true);
     document.addEventListener('change', changeFunction, true);
     // --- START: Add hover listener ---
+    console.log("MagicTest: Attempting to add mouseover listener."); // ADDED: Log before adding
     document.addEventListener('mouseover', mouseoverFunction, true);
     // We might need mouseout/mouseleave to clear the timeout if the mouse leaves *before* the debounce triggers
+    console.log("MagicTest: Attempting to add mouseout listener."); // ADDED: Log before adding
     document.addEventListener('mouseout', () => clearTimeout(hoverTimeoutId), true);
     // --- END: Add hover listener ---
+    console.log("MagicTest: addListeners function finished."); // ADDED: Log exit
   }
+
+  // Initialization
+  console.log("MagicTest: Script execution start."); // ADDED: Log script start
+  initializeMutationObserver(); // Ensure observer is initialized early
+  addListeners(); // Add listeners after functions are defined
+  console.log("MagicTest: Script execution end (initialization complete)."); // ADDED: Log script end
 
 </script>
