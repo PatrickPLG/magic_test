@@ -810,15 +810,29 @@
 
   function mutationStart(element) {
       if (!mutationObserver) {
-          console.error("MagicTest: mutationStart called but mutationObserver is not initialized!"); // ADDED: Check before use
-          return; // Avoid error if not initialized
+          console.error("MagicTest: mutationStart called but mutationObserver is not initialized!");
+          return;
       }
-      console.log("MagicTest: mutationStart called. Observer state:", mutationObserver); // ADDED: Log state before use
+      console.log("MagicTest: mutationStart called. Observer state:", mutationObserver);
+
+      // --- START: Fix Observe Target ---
+      let targetNode = document.body; // Default to body
+      if (element instanceof Node) {
+          targetNode = element;
+      } else if (element) {
+          // Log a warning if element is provided but not a Node
+          console.warn("MagicTest: mutationStart called with non-Node element, falling back to document.body. Element:", element);
+          // targetNode remains document.body
+      }
+      // If element is null/undefined, targetNode remains document.body (no warning needed)
+
+      console.log("MagicTest: MutationObserver attempting to observe target:", targetNode); // ADDED: Log actual target
       try {
-          mutationObserver.observe(element || document.body, { childList: true, subtree: true, attributes: true });
+          mutationObserver.observe(targetNode, { childList: true, subtree: true, attributes: true });
       } catch (e) {
           console.error("MagicTest: Error starting MutationObserver observation:", e);
       }
+      // --- END: Fix Observe Target ---
   }
 
   function mutationEnd() {
@@ -838,19 +852,23 @@
   // --- END Mutation Observer logic ---
 
   function addListeners() {
-    console.log("MagicTest: addListeners function entered."); // ADDED: Log entry
+    console.log("MagicTest: addListeners function entered.");
     document.addEventListener('click', clickFunction, true);
     document.addEventListener('keypress', keypressFunction, true);
     document.addEventListener('keydown', keyDownFunction, true);
-    document.addEventListener('change', changeFunction, true);
+
+    // --- START: Fix changeFunction ReferenceError ---
+    // document.addEventListener('change', changeFunction, true); // COMMENTED OUT: changeFunction is not defined
+    console.log("MagicTest: Skipping attachment of undefined changeFunction listener."); // ADDED: Log skip
+    // --- END: Fix changeFunction ReferenceError ---
+
     // --- START: Add hover listener ---
-    console.log("MagicTest: Attempting to add mouseover listener."); // ADDED: Log before adding
+    console.log("MagicTest: Attempting to add mouseover listener.");
     document.addEventListener('mouseover', mouseoverFunction, true);
-    // We might need mouseout/mouseleave to clear the timeout if the mouse leaves *before* the debounce triggers
-    console.log("MagicTest: Attempting to add mouseout listener."); // ADDED: Log before adding
+    console.log("MagicTest: Attempting to add mouseout listener.");
     document.addEventListener('mouseout', () => clearTimeout(hoverTimeoutId), true);
     // --- END: Add hover listener ---
-    console.log("MagicTest: addListeners function finished."); // ADDED: Log exit
+    console.log("MagicTest: addListeners function finished.");
   }
 
   // Initialization
