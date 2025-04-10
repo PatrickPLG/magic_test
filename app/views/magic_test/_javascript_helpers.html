@@ -246,6 +246,102 @@
   }
   // --- END: New Selector Logic ---
 
+  // --- START Mutation Observer logic ---
+  let mutationObserver = undefined;
+  let observedMutations = [];
+  let mutationTimer = null;
+  const MUTATION_DEBOUNCE_MS = 150;
+
+  function initializeMutationObserver() {
+    console.log("MagicTest: initializeMutationObserver called");
+    if (typeof MutationObserver === 'undefined') {
+        console.warn("MagicTest: MutationObserver not supported by this browser.");
+        return;
+    }
+    if (mutationObserver) {
+        console.log("MagicTest: MutationObserver already initialized.");
+        return; // Avoid re-initialization
+    }
+    try {
+        mutationObserver = new MutationObserver(mutations => {
+            // Optimization: Filter out mutations we definitely don't care about?
+            // const filteredMutations = mutations.filter(m => m.type === 'childList' || m.type === 'attributes');
+            // if (filteredMutations.length === 0) return;
+            observedMutations.push(...mutations); // Push all for now
+            clearTimeout(mutationTimer);
+            mutationTimer = setTimeout(processMutations, MUTATION_DEBOUNCE_MS);
+        });
+        console.log("MagicTest: MutationObserver initialized successfully:", mutationObserver);
+    } catch (e) {
+        console.error("MagicTest: Error initializing MutationObserver:", e);
+        mutationObserver = undefined; // Ensure it's undefined on error
+    }
+  }
+
+  function processMutations() {
+      if (observedMutations.length === 0) return;
+      console.log("[MagicTest Debug] Processing stored mutations:", observedMutations);
+      // Placeholder: Actual logic to analyze mutations and potentially
+      // record derived events (e.g., element appearance) would go here.
+      // For now, just clear the buffer.
+      observedMutations = []; // Clear buffer after processing (or attempted processing)
+  }
+
+  function mutationStart(element) {
+      // Ensure initialized before starting
+      if (!mutationObserver) {
+          console.warn("MagicTest: mutationStart called before observer was initialized. Attempting init now.");
+          initializeMutationObserver();
+          // If init failed, observer will still be undefined
+          if (!mutationObserver) {
+              console.error("MagicTest: mutationStart failed - observer could not be initialized!");
+              return;
+          }
+      }
+      console.log("MagicTest: mutationStart called. Current Observer state:", mutationObserver);
+
+      let targetNode = document.body;
+      if (element instanceof Node) {
+          targetNode = element;
+      } else if (element) {
+          console.warn("MagicTest: mutationStart called with non-Node element, falling back to document.body. Element:", element);
+      }
+
+      console.log("MagicTest: MutationObserver attempting to observe target:", targetNode);
+      try {
+          // Disconnect first to avoid observing the same node multiple times if called rapidly?
+          // mutationObserver.disconnect(); // Consider if needed/safe
+          mutationObserver.observe(targetNode, { childList: true, subtree: true, attributes: true });
+      } catch (e) {
+          console.error("MagicTest: Error starting MutationObserver observation:", e, "Target:", targetNode);
+      }
+  }
+
+  function mutationEnd() {
+      // Don't try to disconnect if it was never initialized or failed init
+      if (!mutationObserver) {
+          console.log("MagicTest: mutationEnd called but mutationObserver is not initialized. Nothing to disconnect.");
+          return;
+      }
+      console.log("MagicTest: mutationEnd called. Current Observer state:", mutationObserver);
+      try {
+          mutationObserver.disconnect();
+          console.log("MagicTest: MutationObserver disconnected.");
+          processMutations(); // Process any remaining mutations immediately
+      } catch (e) {
+          // Ignore DOMException: Failed to execute 'disconnect' on 'MutationObserver': The observer is already disconnected.
+          // These can happen if mutationEnd is called multiple times quickly.
+          if (e.name === 'NotFoundError' || e.message.includes('already disconnected')) {
+               console.log("MagicTest: Observer already disconnected, ignoring disconnect error.");
+          } else {
+              console.error("MagicTest: Error disconnecting MutationObserver:", e);
+          }
+      } finally {
+          observedMutations = []; // Ensure buffer is cleared even if disconnect fails
+      }
+  }
+  // --- END Mutation Observer logic ---
+
   ready(function() {
     console.log("🪄 Magic Test activated in the browser!")
     initializeStorage();
@@ -626,5 +722,19 @@
     }
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   }
+
+  // --- Initialization --- Ensure this runs once and reliably
+  (function() {
+      // Prevent multiple initializations if script is somehow loaded twice
+      if (window.magicTestInitialized) {
+          console.log("MagicTest: Already initialized. Skipping.");
+          return;
+      }
+      window.magicTestInitialized = true;
+      console.log("MagicTest: Script execution start.");
+      initializeMutationObserver();
+      addListeners();
+      console.log("MagicTest: Script execution end (initialization complete).");
+  })(); // Immediately Invoked Function Expression (IIFE)
 
 </script>
