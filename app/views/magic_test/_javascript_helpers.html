@@ -366,10 +366,16 @@
             const style = window.getComputedStyle(child);
             const opacity = parseFloat(style.opacity);
             const hasShowClass = child.classList.contains('show');
-            const isHiddenNow = style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !hasShowClass;
-            // --- START: Enhanced Logging ---
-            const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, show: ${hasShowClass}, pos: ${style.position}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
-            // --- END: Enhanced Logging ---
+
+            // --- START: Add Left Position Check ---
+            const leftPos = parseFloat(style.left);
+            const isHiddenByStandardChecks = style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !hasShowClass;
+            // Hidden if significantly off-screen left. Treat NaN as not hidden by position.
+            const isHiddenByPosition = !isNaN(leftPos) && leftPos < -5;
+            const isHiddenNow = isHiddenByStandardChecks || isHiddenByPosition;
+
+            const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, show: ${hasShowClass}, pos: ${style.position}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
+            // --- END: Add Left Position Check ---
             console.log(`[MagicTest Hover Debug]   Direct Child ${i}:`, child, details);
 
             if (initialChildVisibilityData[i].hidden && !isHiddenNow) {
@@ -391,10 +397,16 @@
                 const opacity = parseFloat(style.opacity);
                 const childHasShowClass = child.classList.contains('show');
                 const parentLiHasShowClass = parentElementLi.classList.contains('show');
-                const isHiddenNow = (style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !childHasShowClass) && !parentLiHasShowClass;
-                // --- START: Enhanced Logging ---
-                const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, child.show: ${childHasShowClass}, parentLi.show: ${parentLiHasShowClass}, pos: ${style.position}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
-                 // --- END: Enhanced Logging ---
+
+                // --- START: Add Left Position Check ---
+                const leftPos = parseFloat(style.left);
+                const isHiddenByStandardChecks = (style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !childHasShowClass) && !parentLiHasShowClass;
+                 // Hidden if significantly off-screen left. Treat NaN as not hidden by position.
+                const isHiddenByPosition = !isNaN(leftPos) && leftPos < -5;
+                const isHiddenNow = isHiddenByStandardChecks || isHiddenByPosition;
+
+                const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, child.show: ${childHasShowClass}, parentLi.show: ${parentLiHasShowClass}, pos: ${style.position}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
+                // --- END: Add Left Position Check ---
                 console.log(`[MagicTest Hover Debug]   Parent LI Child ${i}:`, child, details);
 
                 if (initialParentLiChildVisibilityData[i].hidden && !isHiddenNow) {
