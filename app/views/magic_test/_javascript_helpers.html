@@ -298,64 +298,79 @@
 
     // --- START: Find Dropdown Trigger & Initial State ---
     let triggerElement = null;
+    let parentLi = null; // ADDED: Variable for parent LI
     if (targetElement.matches('[data-bs-toggle="dropdown"]')) {
       triggerElement = targetElement;
+      parentLi = triggerElement.closest('li'); // ADDED: Find parent LI here too
     } else {
-        const parentLi = targetElement.closest('li');
+        // Find parent LI first, then look for trigger inside it
+        parentLi = targetElement.closest('li');
         if (parentLi) {
             triggerElement = parentLi.querySelector('[data-bs-toggle="dropdown"]');
         }
     }
 
     let initialAriaExpanded = null;
+    let initialParentShow = null; // ADDED: Variable for initial parent show state
     if (triggerElement) {
         initialAriaExpanded = triggerElement.getAttribute('aria-expanded') === 'true';
-        console.log("[MagicTest Hover Debug] Found dropdown trigger:", triggerElement, `Initial aria-expanded: ${initialAriaExpanded}`);
+        // Check parentLi existence before accessing classList
+        initialParentShow = parentLi ? parentLi.classList.contains('show') : null; // ADDED: Get initial parent show state
+        console.log(`[MagicTest Hover Debug] Found dropdown trigger:`, triggerElement, `Parent LI:`, parentLi);
+        console.log(`[MagicTest Hover Debug]   Initial aria-expanded: ${initialAriaExpanded}, Initial parentLi.show: ${initialParentShow}`);
     } else {
-        // console.log("[MagicTest Hover Debug] No dropdown trigger found for hover target.");
-        // For now, we ONLY handle dropdown hovers. Exit if no trigger found.
-        // Later, we could re-add style checks here as a fallback.
-        return; 
+        // If no trigger, exit (still only handling dropdowns)
+        return;
     }
     // --- END: Find Dropdown Trigger & Initial State ---
 
-    // Store the element originally hovered, the trigger, and its initial state for the callback
+    // Store the element originally hovered, the trigger, its state, and parent LI for the callback
     const originalHoverTarget = targetElement;
+    // parentLi, initialParentShow, triggerElement, initialAriaExpanded are available via closure
 
     hoverTimeoutId = setTimeout(() => {
       requestAnimationFrame(() => {
-        // No longer need the inner setTimeout
-        console.log("[MagicTest Hover Debug] Checking aria-expanded inside requestAnimationFrame for trigger:", triggerElement);
+        console.log("[MagicTest Hover Debug] Checking aria-expanded & parentLi.show inside rAF for trigger:", triggerElement);
         let significantHover = false;
         let elementToRecordSelector = null;
 
-        // --- START: Check aria-expanded State ---
-        if (triggerElement) { // Check should always be true if we got here
+        // --- START: Check aria-expanded & parentLi Show State ---
+        if (triggerElement) {
+            // Get current states
             const currentAriaExpanded = triggerElement.getAttribute('aria-expanded') === 'true';
-            console.log(`[MagicTest Hover Debug] Dropdown Check: Initial: ${initialAriaExpanded}, Current: ${currentAriaExpanded}`);
+            // Check parentLi existence before accessing classList
+            const currentParentShow = parentLi ? parentLi.classList.contains('show') : false;
 
-            if (initialAriaExpanded === false && currentAriaExpanded === true) {
-                console.log("[MagicTest Hover Debug] --> Significant change detected via aria-expanded!");
+            console.log(`[MagicTest Hover Debug] Dropdown Check: Trigger: ${triggerElement.tagName}, ParentLI: ${parentLi ? parentLi.tagName : 'N/A'}`);
+            console.log(`[MagicTest Hover Debug]   aria-expanded: Initial: ${initialAriaExpanded}, Current: ${currentAriaExpanded}`);
+            console.log(`[MagicTest Hover Debug]   parentLi.show: Initial: ${initialParentShow}, Current: ${currentParentShow}`);
+
+            // Check if EITHER state changed from false to true
+            const ariaChanged = (initialAriaExpanded === false && currentAriaExpanded === true);
+            const parentShowChanged = (initialParentShow === false && currentParentShow === true);
+
+            if (ariaChanged || parentShowChanged) {
+                const reason = ariaChanged ? 'aria-expanded' : 'parentLi.show';
+                console.log(`[MagicTest Hover Debug] --> Significant change detected via ${reason}!`);
                 significantHover = true;
                 // Get selector for the TRIGGER element
                 const selectorResult = findBestSelector(triggerElement);
                 console.log("[MagicTest Hover Debug] Selector result for trigger:", selectorResult);
                 if (selectorResult.type !== 'error') {
-                    // Use global selector preferentially for hover actions
                     elementToRecordSelector = `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`;
                 } else {
                     console.warn("[MagicTest Hover Debug] Could not find suitable selector for trigger element:", triggerElement);
-                    significantHover = false; // Can't record if we can't find the trigger
+                    significantHover = false;
                 }
             }
         } else {
-            // This block should technically not be reachable due to the early return
             console.log("[MagicTest Hover Debug] Trigger element was null inside rAF, skipping check.");
         }
-        // --- END: Check aria-expanded State ---
+        // --- END: Check aria-expanded & parentLi Show State ---
 
         console.log(`[MagicTest Hover Debug] Significant Hover determined: ${significantHover}`);
 
+        // Record hover if significant change detected and selector found
         if (significantHover && elementToRecordSelector) {
             const recordedData = {
                 action: 'magic_hover',
