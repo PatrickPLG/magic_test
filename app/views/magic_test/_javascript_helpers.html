@@ -385,9 +385,19 @@
                 if (child === targetElement) continue;
                 const style = window.getComputedStyle(child);
                 const opacity = parseFloat(style.opacity);
-                const hasShowClass = child.classList.contains('show');
-                const isHiddenNow = style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !hasShowClass;
-                const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, classList.contains('show'): ${hasShowClass})`;
+                const childHasShowClass = child.classList.contains('show');
+
+                // --- START: Refined Re-Check Logic for Parent LI Children ---
+                const parentLiHasShowClass = parentElementLi.classList.contains('show'); // Check parent LI's class
+                // Considered hidden if standard conditions met AND parent LI lacks .show class
+                const isHiddenNow = (style.display === 'none' ||
+                                     style.visibility === 'hidden' ||
+                                     opacity < 0.1 ||
+                                     !childHasShowClass) // Child lacks show
+                                    && !parentLiHasShowClass; // AND Parent lacks show
+
+                const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, child.show: ${childHasShowClass}, parentLi.show: ${parentLiHasShowClass})`;
+                // --- END: Refined Re-Check Logic for Parent LI Children ---
                 console.log(`[MagicTest Hover Debug]   Parent LI Child ${i}:`, child, details);
 
                 // Check if initial state was hidden and current state is not hidden
