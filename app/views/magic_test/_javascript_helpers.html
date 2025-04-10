@@ -276,6 +276,7 @@
     clearTimeout(hoverTimeoutId);
 
     const element = evt.target;
+    console.log("[MagicTest Hover Debug] Mouseover initial element:", element);
 
     // Basic filtering
     if (!element || element === document.body || element === document.documentElement) {
@@ -288,44 +289,53 @@
         targetElement = element.closest('svg');
         if (!targetElement) return;
     }
+    console.log("[MagicTest Hover Debug] Target element after SVG check:", targetElement);
 
     // --- START: Enhanced Heuristic Setup ---
     const parentElementLi = targetElement.closest('li'); // Find parent LI if it exists
+    console.log("[MagicTest Hover Debug] Parent LI found:", parentElementLi);
 
     // Capture initial visibility state of direct children
     const initialChildVisibility = {};
     if (targetElement.children) {
+      console.log("[MagicTest Hover Debug] Checking initial visibility for", targetElement.children.length, "direct children:");
       for (let i = 0; i < targetElement.children.length; i++) {
         const child = targetElement.children[i];
         const style = window.getComputedStyle(child);
         initialChildVisibility[i] = (style.display === 'none' || style.visibility === 'hidden');
+        console.log(`[MagicTest Hover Debug]   Direct Child ${i}:`, child, `Initial Hidden: ${initialChildVisibility[i]} (display: ${style.display}, visibility: ${style.visibility})`);
       }
     }
 
     // Capture initial visibility state of PARENT LI's children
     const initialParentLiChildVisibility = {};
     if (parentElementLi && parentElementLi.children) {
+        console.log("[MagicTest Hover Debug] Checking initial visibility for", parentElementLi.children.length, "parent LI children:");
         for (let i = 0; i < parentElementLi.children.length; i++) {
             const child = parentElementLi.children[i];
-            // Avoid checking the targetElement itself if it's a direct child of the LI
             if (child === targetElement) continue;
             const style = window.getComputedStyle(child);
             initialParentLiChildVisibility[i] = (style.display === 'none' || style.visibility === 'hidden');
+            console.log(`[MagicTest Hover Debug]   Parent LI Child ${i}:`, child, `Initial Hidden: ${initialParentLiChildVisibility[i]} (display: ${style.display}, visibility: ${style.visibility})`);
         }
     }
     // --- END: Enhanced Heuristic Setup ---
 
     hoverTimeoutId = setTimeout(() => {
+      console.log("[MagicTest Hover Debug] Debounce timeout triggered for:", targetElement);
       let significantHover = false;
 
       // --- START: Enhanced Heuristic Check ---
       // Check direct children again
       if (targetElement.children) {
+         console.log("[MagicTest Hover Debug] Re-checking visibility for direct children:");
         for (let i = 0; i < targetElement.children.length; i++) {
           const child = targetElement.children[i];
           const style = window.getComputedStyle(child);
           const isHiddenNow = (style.display === 'none' || style.visibility === 'hidden');
+          console.log(`[MagicTest Hover Debug]   Direct Child ${i}:`, child, `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility})`);
           if (initialChildVisibility[i] && !isHiddenNow) {
+            console.log("[MagicTest Hover Debug] --> Significant change detected in Direct Child", i);
             significantHover = true;
             break;
           }
@@ -334,13 +344,15 @@
 
       // Check PARENT LI's children again (if no significant change found yet)
       if (!significantHover && parentElementLi && parentElementLi.children) {
+          console.log("[MagicTest Hover Debug] Re-checking visibility for parent LI children:");
           for (let i = 0; i < parentElementLi.children.length; i++) {
               const child = parentElementLi.children[i];
               if (child === targetElement) continue;
               const style = window.getComputedStyle(child);
               const isHiddenNow = (style.display === 'none' || style.visibility === 'hidden');
+              console.log(`[MagicTest Hover Debug]   Parent LI Child ${i}:`, child, `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility})`);
               if (initialParentLiChildVisibility[i] && !isHiddenNow) {
-                  // console.log("[MagicTest Hover Debug] Significant hover detected via parent LI child:", child);
+                  console.log("[MagicTest Hover Debug] --> Significant change detected in Parent LI Child", i);
                   significantHover = true;
                   break;
               }
@@ -348,10 +360,12 @@
       }
       // --- END: Enhanced Heuristic Check ---
 
+      console.log(`[MagicTest Hover Debug] Significant Hover determined: ${significantHover}`);
+
       if (significantHover) {
-        // console.log('[MagicTest Hover Debug] Significant hover detected on:', targetElement);
         // Use findBestSelector to get the selector for the *hovered* element
         let selectorResult = findBestSelector(targetElement);
+        console.log("[MagicTest Hover Debug] Selector result:", selectorResult);
         let recordedData = null;
 
         if (selectorResult.type === 'global') {
@@ -372,12 +386,15 @@
         }
 
         if (recordedData) {
-          // console.log('[MagicTest Hover Debug] Recording hover action:', recordedData);
+          console.log('[MagicTest Hover Debug] Recording hover action:', recordedData);
           var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
           const lastEvent = testingOutput[testingOutput.length - 1];
           if (!lastEvent || !(lastEvent.action === 'magic_hover' && lastEvent.target === recordedData.target)) {
                testingOutput.push(recordedData);
                sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+               console.log('[MagicTest Hover Debug] Pushed hover action to sessionStorage.');
+          } else {
+               console.log('[MagicTest Hover Debug] Skipping duplicate consecutive hover action.');
           }
         }
       }

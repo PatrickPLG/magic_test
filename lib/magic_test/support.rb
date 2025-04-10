@@ -106,17 +106,56 @@ module MagicTest
           end
 
           puts "[MagicTest Ruby Debug Loop] Processing event #{i}: #{event_data.inspect}"
-          # Call the helper, which now handles combined actions directly based on the action type
-          generated_code = generate_action_code(event_data, base_indentation)
-          puts "[MagicTest Ruby Debug Loop] Generated code for event #{i}: #{generated_code.inspect}"
 
-          if generated_code.any?
-             lines_to_add.concat(generated_code)
-             @test_lines_written += generated_code.size
-             puts "[MagicTest Ruby Debug Loop] Added #{generated_code.size} line(s) from event #{i}. Current total lines_to_add: #{lines_to_add.count}"
-           else
-             puts "[MagicTest Ruby Debug Loop] No code generated for event #{i}."
+          # --- START: Re-implement Scope Handling ---
+          if event_data['scopeType'] == 'within'
+            scope_selector = event_data['scopeSelector'] # Already includes quotes from JS
+            nested_action = event_data['action']
+            nested_target = event_data['target']
+            nested_options = event_data['options']
+
+            puts "[MagicTest Ruby Debug Loop] Detected scoped action for event #{i}."
+
+            lines_to_add << base_indentation + "within(#{scope_selector}) do"
+            @test_lines_written += 1
+
+            # Prepare data for the nested action call
+            nested_event_data = {
+              'action' => nested_action,
+              'target' => nested_target,
+              'options' => nested_options
+            }
+
+            # Generate code for the action *inside* the within block, with increased indent
+            nested_generated_code = generate_action_code(nested_event_data, base_indentation + '  ')
+            puts "[MagicTest Ruby Debug Loop] Generated nested code for event #{i}: #{nested_generated_code.inspect}"
+
+            if nested_generated_code.any?
+              lines_to_add.concat(nested_generated_code)
+              @test_lines_written += nested_generated_code.size
+              puts "[MagicTest Ruby Debug Loop] Added #{nested_generated_code.size} nested line(s) from event #{i}. Current total lines_to_add: #{lines_to_add.count}"
+            else
+               puts "[MagicTest Ruby Debug Loop] No nested code generated for event #{i}."
+            end
+
+            lines_to_add << base_indentation + "end"
+            @test_lines_written += 1
+
+          else
+            # --- Not a scoped action, proceed as before ---
+            # Call the helper, which now handles combined actions directly based on the action type
+            generated_code = generate_action_code(event_data, base_indentation)
+            puts "[MagicTest Ruby Debug Loop] Generated code for event #{i}: #{generated_code.inspect}"
+
+            if generated_code.any?
+               lines_to_add.concat(generated_code)
+               @test_lines_written += generated_code.size
+               puts "[MagicTest Ruby Debug Loop] Added #{generated_code.size} line(s) from event #{i}. Current total lines_to_add: #{lines_to_add.count}"
+             else
+               puts "[MagicTest Ruby Debug Loop] No code generated for event #{i}."
+            end
           end
+          # --- END: Re-implement Scope Handling ---
         end
         # --------------------------
 
