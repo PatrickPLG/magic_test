@@ -55,32 +55,51 @@ module MagicTest
       puts "(writing generated Capybara steps to `#{filepath}`.)"
 
       if output && !output.empty?
-        lines_to_add = []
-        output.each do |event_data|
-          base_indentation = indentation
+        lines_to_add = [] # Store generated lines
+        initial_lines_written_count = @test_lines_written # Track lines added *this* flush
 
+        # --- START: Modify loop for lookahead ---
+        output.each_with_index do |event_data, i|
+          # Determine next event for lookahead
+          next_event_data = output[i+1]
+        # --- END: Modify loop for lookahead ---
+
+          base_indentation = indentation # Use indentation calculated earlier
+          puts "[MagicTest Ruby Debug] Processing event #{i}: #{event_data.inspect}" # Add basic event log
+
+          # Check if this is a scoped action
           if event_data["scopeType"] == "within"
             scope_selector = event_data["scopeSelector"]
             lines_to_add << base_indentation + "within(#{scope_selector}) do"
+            @test_lines_written += 1
 
             nested_action_data = {
               "action" => event_data["action"],
               "target" => event_data["target"],
               "options" => event_data["options"]
             }
-            nested_code = generate_action_code(nested_action_data, base_indentation + "  ")
-            lines_to_add << nested_code unless nested_code.nil? || nested_code.empty?
+            # NOTE: Lookahead within `within` blocks is not implemented here.
+            # generate_action_code needs only event_data and indentation for nested.
+            nested_code_lines = generate_action_code(nested_action_data, base_indentation + "  ", nil) # Pass nil for next_event
+            nested_code_lines.each do |line|
+              lines_to_add << line # Already indented by helper
+              @test_lines_written += 1
+            end
 
             lines_to_add << base_indentation + "end"
+            @test_lines_written += 1
           else
-            action_code = generate_action_code(event_data, base_indentation)
-            lines_to_add << action_code unless action_code.nil? || action_code.empty?
+            # Generate code for a non-scoped action, passing next_event
+            # --- START: Handle array return from helper ---
+            # action_code = generate_action_code(event_data, base_indentation)
+            # lines_to_add << action_code unless action_code.nil? || action_code.empty?
+            action_code_lines = generate_action_code(event_data, base_indentation, next_event_data)
+            action_code_lines.each do |line|
+              lines_to_add << line # Already indented by helper
+              @test_lines_written += 1
+            end
+            # --- END: Handle array return from helper ---
           end
-        end
-
-        lines_to_add.each do |line|
-          chunks.first << line + "\n"
-          @test_lines_written += 1
         end
 
         contents = chunks.flatten.join
@@ -165,40 +184,69 @@ module MagicTest
         .first.split(":").first(2)
     end
 
-    def generate_action_code(event_data, indentation)
-      generated_code = nil
+    def generate_action_code(event_data, indentation, next_event_data)
+      # Returns an ARRAY of indented code strings
+      code_lines = []
       action = event_data["action"]
       target = event_data["target"]
       options = event_data["options"]
 
+      # Common elements for Chosen
+      chosen_container_selector = "'##{target}_chosen'"
+      chosen_open_line = indentation + "find(#{chosen_container_selector}).click"
+
       case action
       when "magic_choose_open"
-        chosen_container_selector = "'##{target}_chosen'"
-        generated_code = "find(#{chosen_container_selector}).click"
+        # Check if next event is select/search for the same target
+        should_suppress_open = next_event_data &&
+                               ["magic_choose_select", "magic_choose_search"].include?(next_event_data["action"]) &&
+                               next_event_data["target"] == target
+
+        if should_suppress_open
+          puts "[MagicTest Ruby Debug] Suppressing _open action, handled by next event." # Add log
+          # Return empty array, action handled by next step
+        else
+          puts "[MagicTest Ruby Debug] Generating standalone _open action." # Add log
+          code_lines << chosen_open_line
+        end
+
       when "magic_choose_select"
         option_text = options.to_s.gsub("'", "\\\'")
-        chosen_container_selector = "'##{target}_chosen'"
-        generated_code = "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
+        select_line = indentation + "find(#{chosen_container_selector}).find('ul.chosen-results li', text: '#{option_text}').click"
+        puts "[MagicTest Ruby Debug] Generating combined _open + _select action." # Add log
+        code_lines << chosen_open_line # Implicit open
+        code_lines << select_line      # Actual select
+
       when "magic_choose_search"
         search_text = options.to_s.gsub("'", "\\\'")
-        chosen_container_selector = "'##{target}_chosen'"
-        generated_code = "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
+        search_line = indentation + "find(#{chosen_container_selector}).find('input.chosen-search-input').set('#{search_text}')"
+        puts "[MagicTest Ruby Debug] Generating combined _open + _search action." # Add log
+        code_lines << chosen_open_line # Implicit open
+        code_lines << search_line      # Actual search
+
       when "magic_choose_deselect"
         option_text = options.to_s.gsub("'", "\\\'")
-        chosen_container_selector = "'##{target}_chosen'"
-        generated_code = "find(#{chosen_container_selector}).find('li.search-choice', text: '#{option_text}').find('a.search-choice-close').click"
+        deselect_line = indentation + "find(#{chosen_container_selector}).find('li.search-choice', text: '#{option_text}').find('a.search-choice-close').click"
+        puts "[MagicTest Ruby Debug] Generating _deselect action." # Add log
+        code_lines << deselect_line # Deselect doesn't need implicit open
+
       when "find"
+        find_line = nil
         if options&.start_with?(".")
-          generated_code = "find(#{target})#{options}"
+          find_line = indentation + "find(#{target})#{options}"
         else
-          puts "WARN: MagicTest encountered 'find' action without a chained method (.click, .set, etc.): #{event_data.inspect}"
-          generated_code = "find(#{target})"
+          # puts "WARN: MagicTest encountered 'find' action without a chained method (.click, .set, etc.): #{event_data.inspect}"
+          find_line = indentation + "find(#{target})"
         end
-      else
-        generated_code = "#{action} #{target}#{options}"
+        code_lines << find_line if find_line
+
+      else # Default for click_on, fill_in, etc.
+        default_line = indentation + "#{action} #{target}#{options}"
+        code_lines << default_line
       end
 
-      generated_code.nil? ? nil : indentation + generated_code
+      # Return the array of indented code lines
+      code_lines
     end
   end
 end
