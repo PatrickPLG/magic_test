@@ -384,13 +384,15 @@
     // --- END: Debounce Check ---
 
     let element = event.target;
+    console.log("[MagicTest Click Debug] Initial click target:", element);
 
-    // --- START: Handle clicks on SVG children ---
-    const actionableParent = element.closest('.quantity-btn');
+    // --- START: Handle clicks on SVG children / Inside Links/Buttons ---
+    const actionableParent = element.closest('a, button, .quantity-btn'); // Include a, button
     if (actionableParent && actionableParent !== element) {
+       console.log("[MagicTest Click Debug] Clicked inside actionable parent. Retargeting to:", actionableParent);
        element = actionableParent;
     }
-    // --- END: Handle clicks on SVG children ---
+    // --- END: Handle clicks on SVG children / Inside Links/Buttons ---
 
     // --- START: Prioritize Bootstrap Dropdown Trigger ---
     const dropdownTrigger = element.closest('[data-bs-toggle="dropdown"]');
@@ -402,7 +404,75 @@
     var tagName = element.tagName;
     let recordedData = null;
 
-    // --- Chosen.js Handling --- START (Check *after* potential SVG/Dropdown target adjustment)
+    // --- START: Semantic Handling for Labels/Radio/Checkbox Wrappers ---
+    // 1. Click directly on a <label for="...">?
+    if (tagName === 'LABEL' && element.htmlFor) {
+        const inputId = element.htmlFor;
+        const targetInput = document.getElementById(inputId);
+        const labelText = (element.textContent || element.innerText || '').trim();
+        if (labelText) {
+            console.log(`[MagicTest Click Debug] Clicked label for #${inputId}. Recording choose action.`);
+            recordedData = {
+                action: "magic_choose",
+                target: "\'" + labelText.replace(/\'/g, "\\\'") + "\'", // Use label text
+                options: ""
+            };
+            // Record and exit early
+            var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+            testingOutput.push(recordedData);
+            sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+            lastClickTimestamp = Date.now();
+            return;
+        } else if (targetInput) {
+             // Fallback if label has no text but input exists
+             console.log(`[MagicTest Click Debug] Clicked label for #${inputId} (no text). Falling back to find input.`);
+             // Let the default find logic handle clicking the input via ID selector if possible
+             // We modify the element variable to target the input directly
+             element = targetInput;
+             tagName = element.tagName;
+             console.log("[MagicTest Click Debug] Retargeted element to input:", element);
+             // Now let the rest of the function try to find a selector for the input
+        } else {
+            console.warn(`[MagicTest Click Debug] Clicked label for #${inputId}, but label has no text and input not found.`);
+            // Let the default logic try to handle the label element itself
+        }
+    }
+    // 2. Click on a common wrapper element? (e.g., .checkmark, or maybe a parent .form-check)
+    //    Let's target .checkmark specifically first as it's less likely to contain other things.
+    else if (element.matches('.checkmark') || element.closest('.checkmark')) {
+        const wrapper = element.closest('.form-check, .radio, .checkbox') || element.closest('label'); // Look for common parents
+        if (wrapper) {
+            const input = wrapper.querySelector('input[type="radio"], input[type="checkbox"]');
+            const label = wrapper.querySelector('label');
+            const labelText = label ? (label.textContent || label.innerText || '').trim() : null;
+
+            if (input && labelText) {
+                console.log(`[MagicTest Click Debug] Clicked checkmark wrapper inside label/form-check. Recording choose action.`);
+                recordedData = {
+                    action: "magic_choose",
+                    target: "\'" + labelText.replace(/\'/g, "\\\'") + "\'",
+                    options: ""
+                };
+                // Record and exit early
+                var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+                testingOutput.push(recordedData);
+                sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+                lastClickTimestamp = Date.now();
+                return;
+            } else if (input) {
+                 console.log(`[MagicTest Click Debug] Clicked checkmark wrapper, found input but no label text. Retargeting to input.`);
+                 element = input; // Target the input directly for find logic
+                 tagName = element.tagName;
+                 console.log("[MagicTest Click Debug] Retargeted element to input:", element);
+            } else {
+                 console.warn(`[MagicTest Click Debug] Clicked checkmark wrapper, but couldn't find associated input.`);
+                 // Let default logic try to handle the clicked wrapper
+            }
+        }
+    }
+    // --- END: Semantic Handling for Labels/Radio/Checkbox Wrappers ---
+
+    // --- Chosen.js Handling --- START
     const chosenContainer = element.closest('div.chosen-container');
     if (chosenContainer) {
         const originalSelectId = getOriginalSelectId(chosenContainer);
@@ -587,28 +657,38 @@
     // Default handling for standard inputs
     var charCode = evt.keyCode || evt.which;
     var charStr = String.fromCharCode(charCode);
-    if (!evt.target.labels || evt.target.labels.length === 0) { // Check if labels exist
-      // Handle inputs without labels (e.g., use placeholder or name as fallback?)
+    if (!evt.target.labels || evt.target.labels.length === 0) {
+      // Check if labels exist
       // For now, just return to avoid errors.
       // console.log("MagicTest: Keypress on element without labels, ignored.", evt.target);
       return;
     }
     var label = evt.target.labels[0].textContent;
+    // Escape single quotes within the value itself
     var text = (evt.target.value + charStr).trim().replace("'", "\\\'");
     var action = "fill_in";
     // Use label text or fall back to input name/id if label is empty
     var targetIdentifier = label || evt.target.name || evt.target.id;
     if (!targetIdentifier) return; // Cannot identify the input field
 
+    // Target should be the identifier (label/name/id) WITH single quotes added
     var target = "\'" + targetIdentifier.trim().replace("'", "\\\'") + "\'";
-    var options = ", with: '" + text + "'";
+    // Options should ONLY be the value itself, no "with:"
+    var options = text;
+
     var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
     var lastAction = testingOutput[testingOutput.length - 1];
+
+    // --- START: Fix Aggregation Logic ---
+    // Check if the last action was a fill_in for the same target
     if (lastAction && lastAction.action == action && lastAction.target == target) {
+      // Update the 'options' (value) of the last action
       lastAction.options = options;
     } else {
+      // Push a new action
       testingOutput.push({action: action, target: target, options: options});
     }
+    // --- END: Fix Aggregation Logic ---
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   }
 

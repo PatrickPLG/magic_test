@@ -221,46 +221,58 @@ module MagicTest
 
     def generate_action_code(event_data, base_indentation)
       action = event_data['action']
-      target = event_data['target']
-      options = event_data['options']
-      code = [] # Always return an array
+      target = event_data['target'] # Expects quotes from JS
+      options = event_data['options'] # Expects raw value (or method call for find)
+      code = []
 
       case action
       when 'fill_in'
-        code << "#{base_indentation}fill_in '#{target}', with: '#{options}'"
-        # puts "[MagicTest Ruby Debug] Generating fill_in."
+        # Format: fill_in 'label_or_id', with: 'value'
+        # JS provides target=''label_or_id'', options='value'
+        # Need to add quotes around the options value here
+        code << "#{base_indentation}fill_in #{target}, with: '#{options}'"
       when 'click_on'
-        code << "#{base_indentation}click_on #{target}" # Target should include quotes if it's a string
-        # puts "[MagicTest Ruby Debug] Generating click_on."
+        # Format: click_on 'button_link_or_text'
+        # JS provides target="'text'", options=""
+        code << "#{base_indentation}click_on #{target}" # Target already has quotes
+      when 'find'
+        # Format: find('selector').action_or_chain
+        # JS provides target="'selector'", options=".click" or ".send_keys(...)"
+        code << "#{base_indentation}find(#{target})#{options}" # Target has quotes, options has method call
       when 'click'
          code << "#{base_indentation}find('#{target}').click" # Assuming target is an ID selector
-         # puts "[MagicTest Ruby Debug] Generating click."
       when 'select'
-        code << "#{base_indentation}select '#{options}', from: '#{target}'"
-        # puts "[MagicTest Ruby Debug] Generating select."
+        # Format: select 'option_text', from: 'label_or_id'
+        # JS provides target=''label_or_id'', options='option_text'
+        # Target needs quotes from JS, Options needs quotes added here
+        code << "#{base_indentation}select '#{options}', from: #{target}"
+      when 'magic_hover'
+        # Format: find('selector').hover
+        # JS provides target="'selector'", options=""
+        code << "#{base_indentation}find(#{target}).hover" # Target includes quotes
+      when 'magic_choose'
+        # Format: choose 'Label Text'
+        # JS provides target="'Label Text'", options=""
+        code << "#{base_indentation}choose(#{target})" # Target includes quotes
       # --- Chosen.js Specific Actions ---
       when 'magic_choose_open'
         # This only runs if it wasn't skipped by the lookahead in flush
         chosen_target = "##{target}_chosen"
         code << "#{base_indentation}find('#{chosen_target}').click"
-        # puts "[MagicTest Ruby Debug] Generating standalone magic_choose_open."
       when 'magic_choose_select'
         # Generates the combined open + select sequence
         chosen_target = "##{target}_chosen"
         code << "#{base_indentation}find('#{chosen_target}').click"
         code << "#{base_indentation}find('#{chosen_target}').find('ul.chosen-results li', text: '#{options}').click"
-        # puts "[MagicTest Ruby Debug] Generating combined magic_choose_select."
       when 'magic_choose_search'
          # Generates the combined open + search sequence
          chosen_target = "##{target}_chosen"
          code << "#{base_indentation}find('#{chosen_target}').click"
          code << "#{base_indentation}find('#{chosen_target}').find('input').set('#{options}')"
-        # puts "[MagicTest Ruby Debug] Generating combined magic_choose_search."
       when 'magic_choose_deselect'
         chosen_target = "##{target}_chosen"
         # Find the specific deselect link for the given option text
         code << "#{base_indentation}find('#{chosen_target}').find('ul.chosen-choices li.search-choice span', text: '#{options}').sibling('a.search-choice-close').click"
-        # puts "[MagicTest Ruby Debug] Generating magic_choose_deselect."
       else
         # Maybe log unhandled actions?
         # puts "[MagicTest Ruby Debug] Warning: Unhandled action type '#{action}'"
