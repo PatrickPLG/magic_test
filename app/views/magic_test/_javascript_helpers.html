@@ -351,114 +351,108 @@
     // --- END: Enhanced Heuristic Setup ---
 
     hoverTimeoutId = setTimeout(() => {
-      // --- START: Wrap re-check in requestAnimationFrame ---
       requestAnimationFrame(() => {
         console.log("[MagicTest Hover Debug] Re-check executing inside requestAnimationFrame for target:", targetElement);
-        let significantHover = false;
+        setTimeout(() => {
+            console.log("[MagicTest Hover Debug] Inner setTimeout (10ms) triggered for final check.");
+            let significantHover = false;
 
-        // --- START: Enhanced Heuristic Check ---
-        // Check direct children again
-        if (targetElement.children) {
-           console.log("[MagicTest Hover Debug] Re-checking visibility for direct children:");
-          for (let i = 0; i < targetElement.children.length; i++) {
-            if (!initialChildVisibilityData[i]) continue;
-            const child = targetElement.children[i];
-            const style = window.getComputedStyle(child);
-            const opacity = parseFloat(style.opacity);
-            const hasShowClass = child.classList.contains('show');
-
-            // --- START: Add Left Position Check ---
-            const leftPos = parseFloat(style.left);
-            const isHiddenByStandardChecks = style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !hasShowClass;
-            // Hidden if significantly off-screen left. Treat NaN as not hidden by position.
-            const isHiddenByPosition = !isNaN(leftPos) && leftPos < -5;
-            const isHiddenNow = isHiddenByStandardChecks || isHiddenByPosition;
-
-            const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, show: ${hasShowClass}, pos: ${style.position}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
-            // --- END: Add Left Position Check ---
-            console.log(`[MagicTest Hover Debug]   Direct Child ${i}:`, child, details);
-
-            if (initialChildVisibilityData[i].hidden && !isHiddenNow) {
-              console.log("[MagicTest Hover Debug] --> Significant change detected in Direct Child", i, "Initial state:", initialChildVisibilityData[i].details);
-              significantHover = true;
-              break;
-            }
-          }
-        }
-
-        // Check PARENT LI's children again (if no significant change found yet)
-        if (!significantHover && parentElementLi && parentElementLi.children) {
-            console.log("[MagicTest Hover Debug] Re-checking visibility for parent LI children:");
-            for (let i = 0; i < parentElementLi.children.length; i++) {
-                if (!initialParentLiChildVisibilityData[i]) continue;
-                const child = parentElementLi.children[i];
-                if (child === targetElement) continue;
+            // --- START: Enhanced Heuristic Check (Inside Inner Timeout) ---
+            // Check direct children again
+            if (targetElement.children) {
+               console.log("[MagicTest Hover Debug] Re-checking visibility for direct children:");
+              for (let i = 0; i < targetElement.children.length; i++) {
+                if (!initialChildVisibilityData[i]) continue;
+                const child = targetElement.children[i];
                 const style = window.getComputedStyle(child);
                 const opacity = parseFloat(style.opacity);
-                const childHasShowClass = child.classList.contains('show');
-                const parentLiHasShowClass = parentElementLi.classList.contains('show');
+                const hasShowClass = child.classList.contains('show');
 
-                // --- START: Add Left Position Check ---
                 const leftPos = parseFloat(style.left);
-                const isHiddenByStandardChecks = (style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !childHasShowClass) && !parentLiHasShowClass;
-                 // Hidden if significantly off-screen left. Treat NaN as not hidden by position.
+                const isHiddenByStandardChecks = style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !hasShowClass;
                 const isHiddenByPosition = !isNaN(leftPos) && leftPos < -5;
                 const isHiddenNow = isHiddenByStandardChecks || isHiddenByPosition;
 
-                const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, child.show: ${childHasShowClass}, parentLi.show: ${parentLiHasShowClass}, pos: ${style.position}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
-                // --- END: Add Left Position Check ---
-                console.log(`[MagicTest Hover Debug]   Parent LI Child ${i}:`, child, details);
+                const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, show: ${hasShowClass}, pos: ${style.position}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
+                console.log(`[MagicTest Hover Debug]   Direct Child ${i}:`, child, details);
 
-                if (initialParentLiChildVisibilityData[i].hidden && !isHiddenNow) {
-                    console.log("[MagicTest Hover Debug] --> Significant change detected in Parent LI Child", i, "Initial state:", initialParentLiChildVisibilityData[i].details);
-                    significantHover = true;
-                    break;
+                if (initialChildVisibilityData[i].hidden && !isHiddenNow) {
+                  console.log("[MagicTest Hover Debug] --> Significant change detected in Direct Child", i, "Initial state:", initialChildVisibilityData[i].details);
+                  significantHover = true;
+                  break;
+                }
+              }
+            }
+
+            // Check PARENT LI's children again (if no significant change found yet)
+            if (!significantHover && parentElementLi && parentElementLi.children) {
+                console.log("[MagicTest Hover Debug] Re-checking visibility for parent LI children:");
+                for (let i = 0; i < parentElementLi.children.length; i++) {
+                    if (!initialParentLiChildVisibilityData[i]) continue;
+                    const child = parentElementLi.children[i];
+                    if (child === targetElement) continue;
+                    const style = window.getComputedStyle(child);
+                    const opacity = parseFloat(style.opacity);
+                    const childHasShowClass = child.classList.contains('show');
+                    const parentLiHasShowClass = parentElementLi.classList.contains('show');
+
+                    const leftPos = parseFloat(style.left);
+                    const isHiddenByStandardChecks = (style.display === 'none' || style.visibility === 'hidden' || opacity < 0.1 || !childHasShowClass) && !parentLiHasShowClass;
+                    const isHiddenByPosition = !isNaN(leftPos) && leftPos < -5;
+                    const isHiddenNow = isHiddenByStandardChecks || isHiddenByPosition;
+
+                    const details = `Now Hidden: ${isHiddenNow} (display: ${style.display}, visibility: ${style.visibility}, opacity: ${opacity}, child.show: ${childHasShowClass}, parentLi.show: ${parentLiHasShowClass}, pos: ${style.position}, L: ${style.left}, T: ${style.top}, transform: ${style.transform}, H: ${style.height}, W: ${style.width}, maxH: ${style.maxHeight}, overflow: ${style.overflow}, clip: ${style.clipPath})`;
+                    console.log(`[MagicTest Hover Debug]   Parent LI Child ${i}:`, child, details);
+
+                    if (initialParentLiChildVisibilityData[i].hidden && !isHiddenNow) {
+                        console.log("[MagicTest Hover Debug] --> Significant change detected in Parent LI Child", i, "Initial state:", initialParentLiChildVisibilityData[i].details);
+                        significantHover = true;
+                        break;
+                    }
                 }
             }
-        }
-        // --- END: Enhanced Heuristic Check ---
+            // --- END: Enhanced Heuristic Check (Inside Inner Timeout) ---
 
-        console.log(`[MagicTest Hover Debug] Significant Hover determined: ${significantHover}`);
+            console.log(`[MagicTest Hover Debug] Significant Hover determined: ${significantHover}`);
 
-        if (significantHover) {
-          // Use findBestSelector to get the selector for the *hovered* element
-          let selectorResult = findBestSelector(targetElement);
-          console.log("[MagicTest Hover Debug] Selector result:", selectorResult);
-          let recordedData = null;
+            if (significantHover) {
+              // Use findBestSelector to get the selector for the *hovered* element
+              let selectorResult = findBestSelector(targetElement);
+              console.log("[MagicTest Hover Debug] Selector result:", selectorResult);
+              let recordedData = null;
 
-          if (selectorResult.type === 'global') {
-              recordedData = {
-                  action: 'magic_hover',
-                  target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector
-                  options: ""
-              };
-          } else if (selectorResult.type === 'scoped') {
-               recordedData = {
-                  action: 'magic_hover',
-                  target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Use combined global selector
-                  options: ""
-              };
-               // console.warn("[MagicTest Hover Debug] Scoped selector found for hover, using global equivalent: ", selectorResult.selector );
-          } else {
-               console.warn("[MagicTest Hover Debug] Could not find suitable selector for hover target:", targetElement);
-          }
+              if (selectorResult.type === 'global') {
+                  recordedData = {
+                      action: 'magic_hover',
+                      target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector
+                      options: ""
+                  };
+              } else if (selectorResult.type === 'scoped') {
+                   recordedData = {
+                      action: 'magic_hover',
+                      target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Use combined global selector
+                      options: ""
+                  };
+                   // console.warn("[MagicTest Hover Debug] Scoped selector found for hover, using global equivalent: ", selectorResult.selector );
+              } else {
+                   console.warn("[MagicTest Hover Debug] Could not find suitable selector for hover target:", targetElement);
+              }
 
-          if (recordedData) {
-            console.log('[MagicTest Hover Debug] Recording hover action:', recordedData);
-            var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-            const lastEvent = testingOutput[testingOutput.length - 1];
-            if (!lastEvent || !(lastEvent.action === 'magic_hover' && lastEvent.target === recordedData.target)) {
-                 testingOutput.push(recordedData);
-                 sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-                 console.log('[MagicTest Hover Debug] Pushed hover action to sessionStorage.');
-            } else {
-                 console.log('[MagicTest Hover Debug] Skipping duplicate consecutive hover action.');
+              if (recordedData) {
+                console.log('[MagicTest Hover Debug] Recording hover action:', recordedData);
+                var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+                const lastEvent = testingOutput[testingOutput.length - 1];
+                if (!lastEvent || !(lastEvent.action === 'magic_hover' && lastEvent.target === recordedData.target)) {
+                     testingOutput.push(recordedData);
+                     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+                     console.log('[MagicTest Hover Debug] Pushed hover action to sessionStorage.');
+                } else {
+                     console.log('[MagicTest Hover Debug] Skipping duplicate consecutive hover action.');
+                }
+              }
             }
-          }
-        }
-        // --- END: Logic moved inside requestAnimationFrame ---
+        }, 10); // 10ms delay
       }); // requestAnimationFrame closing
-      // --- END: Wrap re-check in requestAnimationFrame ---
     }, hoverDebounceTime);
   }
   // --- END: New Hover Listener ---
