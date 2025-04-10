@@ -352,12 +352,6 @@
   }
   // --- END: DOM Ready Handler ---
 
-  ready(function() {
-    console.log("🪄 Magic Test activated in the browser!")
-    initializeMutationObserver();
-    addListeners();
-  });
-
   // Helper to get the original select ID from a chosen container element
   function getOriginalSelectId(chosenElement) {
     const container = chosenElement.closest('div.chosen-container');
@@ -733,18 +727,17 @@
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   }
 
-  // --- Initialization --- Ensure this runs once and reliably
-  // (function() {
-  //     // Prevent multiple initializations if script is somehow loaded twice
-  //     if (window.magicTestInitialized) {
-  //         console.log("MagicTest: Already initialized. Skipping.");
-  //         return;
-  //     }
-  //     window.magicTestInitialized = true;
-  //     console.log("MagicTest: Script execution start.");
-  //     initializeMutationObserver();
-  //     addListeners();
-  //     console.log("MagicTest: Script execution end (initialization complete).");
-  // })(); // Immediately Invoked Function Expression (IIFE)
+  function addListeners() {
+    // ... definition ...
+  }
+
+  // --- END: New Hover Listener ---
+
+  // --- MOVED ready() call to the END --- 
+  ready(function() {
+    console.log("🪄 Magic Test activated in the browser!")
+    initializeMutationObserver(); // Should already be defined
+    addListeners(); // Should now be defined
+  });
 
 </script>
