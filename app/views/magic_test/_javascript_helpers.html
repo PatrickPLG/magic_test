@@ -277,22 +277,22 @@
 
     const element = evt.target;
 
-    // Basic filtering (ignore document itself, etc.)
+    // Basic filtering
     if (!element || element === document.body || element === document.documentElement) {
       return;
     }
 
-    // --- Element Handling (similar to click, simplify for now) ---
+    // --- Element Handling (similar to click) ---
     let targetElement = element;
-    // Handle SVG paths/elements: Find the parent <svg>
     if (element.tagName === 'path' || element.closest('svg')) {
         targetElement = element.closest('svg');
-        if (!targetElement) return; // Should not happen if closest worked
+        if (!targetElement) return;
     }
-    // TODO: Add more specific element checks if needed, like ignoring text nodes directly
 
-    // --- Heuristic: Debounce + Child Visibility Check ---
-    // Get initial visibility state of direct children
+    // --- START: Enhanced Heuristic Setup ---
+    const parentElementLi = targetElement.closest('li'); // Find parent LI if it exists
+
+    // Capture initial visibility state of direct children
     const initialChildVisibility = {};
     if (targetElement.children) {
       for (let i = 0; i < targetElement.children.length; i++) {
@@ -302,21 +302,51 @@
       }
     }
 
+    // Capture initial visibility state of PARENT LI's children
+    const initialParentLiChildVisibility = {};
+    if (parentElementLi && parentElementLi.children) {
+        for (let i = 0; i < parentElementLi.children.length; i++) {
+            const child = parentElementLi.children[i];
+            // Avoid checking the targetElement itself if it's a direct child of the LI
+            if (child === targetElement) continue;
+            const style = window.getComputedStyle(child);
+            initialParentLiChildVisibility[i] = (style.display === 'none' || style.visibility === 'hidden');
+        }
+    }
+    // --- END: Enhanced Heuristic Setup ---
+
     hoverTimeoutId = setTimeout(() => {
       let significantHover = false;
-      // Check child visibility again after debounce
+
+      // --- START: Enhanced Heuristic Check ---
+      // Check direct children again
       if (targetElement.children) {
         for (let i = 0; i < targetElement.children.length; i++) {
           const child = targetElement.children[i];
           const style = window.getComputedStyle(child);
           const isHiddenNow = (style.display === 'none' || style.visibility === 'hidden');
-          // If a child WAS hidden and is NOT hidden now, consider it significant
           if (initialChildVisibility[i] && !isHiddenNow) {
             significantHover = true;
-            break; // Found one significant change, no need to check others
+            break;
           }
         }
       }
+
+      // Check PARENT LI's children again (if no significant change found yet)
+      if (!significantHover && parentElementLi && parentElementLi.children) {
+          for (let i = 0; i < parentElementLi.children.length; i++) {
+              const child = parentElementLi.children[i];
+              if (child === targetElement) continue;
+              const style = window.getComputedStyle(child);
+              const isHiddenNow = (style.display === 'none' || style.visibility === 'hidden');
+              if (initialParentLiChildVisibility[i] && !isHiddenNow) {
+                  // console.log("[MagicTest Hover Debug] Significant hover detected via parent LI child:", child);
+                  significantHover = true;
+                  break;
+              }
+          }
+      }
+      // --- END: Enhanced Heuristic Check ---
 
       if (significantHover) {
         // console.log('[MagicTest Hover Debug] Significant hover detected on:', targetElement);
@@ -331,23 +361,19 @@
                 options: ""
             };
         } else if (selectorResult.type === 'scoped') {
-            // For hover, maybe we prefer global selectors? Or maybe within makes sense?
-            // Let's try global first, but keep scoped logic structure.
              recordedData = {
                 action: 'magic_hover',
-                target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Use combined global selector even if scoped found initially
+                target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Use combined global selector
                 options: ""
             };
-             console.warn("[MagicTest Hover Debug] Scoped selector found for hover, using global equivalent: ", selectorResult.selector );
-
+             // console.warn("[MagicTest Hover Debug] Scoped selector found for hover, using global equivalent: ", selectorResult.selector );
         } else {
-            console.warn("[MagicTest Hover Debug] Could not find suitable selector for hover target:", targetElement);
+             console.warn("[MagicTest Hover Debug] Could not find suitable selector for hover target:", targetElement);
         }
 
         if (recordedData) {
           // console.log('[MagicTest Hover Debug] Recording hover action:', recordedData);
           var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-          // Avoid recording consecutive duplicate hovers on the same target
           const lastEvent = testingOutput[testingOutput.length - 1];
           if (!lastEvent || !(lastEvent.action === 'magic_hover' && lastEvent.target === recordedData.target)) {
                testingOutput.push(recordedData);
