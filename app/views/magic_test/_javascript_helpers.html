@@ -342,10 +342,20 @@
   }
   // --- END Mutation Observer logic ---
 
+  // --- START: DOM Ready Handler ---
+  function ready(fn) {
+    if (document.readyState !== 'loading'){
+        fn();
+    } else {
+        document.addEventListener('DOMContentLoaded', fn);
+    }
+  }
+  // --- END: DOM Ready Handler ---
+
   ready(function() {
     console.log("🪄 Magic Test activated in the browser!")
-    initializeStorage();
     initializeMutationObserver();
+    addListeners();
   });
 
   // Helper to get the original select ID from a chosen container element
@@ -724,17 +734,17 @@
   }
 
   // --- Initialization --- Ensure this runs once and reliably
-  (function() {
-      // Prevent multiple initializations if script is somehow loaded twice
-      if (window.magicTestInitialized) {
-          console.log("MagicTest: Already initialized. Skipping.");
-          return;
-      }
-      window.magicTestInitialized = true;
-      console.log("MagicTest: Script execution start.");
-      initializeMutationObserver();
-      addListeners();
-      console.log("MagicTest: Script execution end (initialization complete).");
-  })(); // Immediately Invoked Function Expression (IIFE)
+  // (function() {
+  //     // Prevent multiple initializations if script is somehow loaded twice
+  //     if (window.magicTestInitialized) {
+  //         console.log("MagicTest: Already initialized. Skipping.");
+  //         return;
+  //     }
+  //     window.magicTestInitialized = true;
+  //     console.log("MagicTest: Script execution start.");
+  //     initializeMutationObserver();
+  //     addListeners();
+  //     console.log("MagicTest: Script execution end (initialization complete).");
+  // })(); // Immediately Invoked Function Expression (IIFE)
 
 </script>
