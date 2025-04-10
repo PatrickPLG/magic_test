@@ -303,67 +303,82 @@
     // --- Chosen.js Handling --- START
     const chosenContainer = element.closest('div.chosen-container');
     if (chosenContainer) {
-      const originalSelectId = getOriginalSelectId(chosenContainer);
-      if (!originalSelectId) return; // Could not map back, ignore
+        // --- START: Refactored Chosen Logic with .closest() and Priority ---
+        console.log("[MagicTest Chosen Debug] Entered Chosen handler. Element:", element);
+        const originalSelectId = getOriginalSelectId(chosenContainer);
+        console.log(`[MagicTest Chosen Debug] Original Select ID: ${originalSelectId}`);
+        if (!originalSelectId) { console.log("[MagicTest Chosen Debug] No originalSelectId found, returning."); return; }
 
-      // Case 1: Click to open the dropdown (on the container or the single selection link)
-      if (element.matches('a.chosen-single, div.chosen-container') || element.closest('a.chosen-single')) {
-        action = "magic_choose_open";
-        target = originalSelectId; // Use original select ID
-        options = "";
-      }
-      // Case 2: Click to select an option from the results list
-      else if (element.matches('ul.chosen-results li')) {
-        action = "magic_choose_select";
-        target = originalSelectId; // Use original select ID
-        options = element.textContent || element.innerText; // Get the selected option's text
-        // Handle potential deselection in multi-select (may need refinement)
-      }
-      // --- START: Add Case for Deselection ---
-      // Case 3: Click to DESELECT an option in a multi-select
-      else if (element.matches('a.search-choice-close')) {
-        const choiceElement = element.closest('li.search-choice');
-        if (choiceElement) {
-            action = "magic_choose_deselect";
-            target = originalSelectId; // Use original select ID
-            // Find the text of the item being deselected (usually in a span)
-            const choiceTextElement = choiceElement.querySelector('span');
-            options = choiceTextElement ? (choiceTextElement.textContent || choiceTextElement.innerText) : '';
-            console.log(`[MagicTest Debug] Chosen Deselect detected. Target: ${target}, Option Text: ${options}`); // Debug Log
-            if (!options) {
-                 console.warn("[MagicTest Debug] Could not determine text for Chosen deselection on element:", choiceElement);
-                 return; // Don't record if we couldn't get the text
+        let chosenAction = null;
+        let chosenTarget = originalSelectId;
+        let chosenOptions = "";
+
+        // Check for the most specific actions first using closest()
+        const selectedLi = element.closest('ul.chosen-results li');
+        const deselectLink = element.closest('ul.chosen-choices li.search-choice a.search-choice-close');
+        const isSearchInput = element.matches('input.chosen-search-input'); // .matches() is ok here
+
+        // Check for open click (broader conditions)
+        const isOpenClick = element.closest('a.chosen-single') || // Single select link
+                            element.closest('div.chosen-choices') || // Multi-select box itself
+                            (element.matches('div.chosen-container') && !isSearchInput && !selectedLi && !deselectLink); // Container itself, unless it was another specific action
+
+        console.log(`[MagicTest Chosen Debug] Checks: deselectLink=${!!deselectLink}, selectedLi=${!!selectedLi}, isOpenClick=${!!isOpenClick}, isSearchInput=${isSearchInput}`);
+
+        // Prioritize checks: Deselect > Select > Open
+        if (deselectLink) {
+            // Case 1: Clicked the 'x' to DESELECT an option in a multi-select
+            const choiceElement = deselectLink.closest('li.search-choice');
+            if (choiceElement) {
+                const choiceTextElement = choiceElement.querySelector('span');
+                const text = choiceTextElement ? (choiceTextElement.textContent || choiceTextElement.innerText) : '';
+                if (text) {
+                    chosenAction = "magic_choose_deselect";
+                    chosenOptions = text;
+                    console.log(`[MagicTest Chosen Debug] Matched: Deselect Action. Option Text: ${text}`);
+                } else {
+                    console.warn("[MagicTest Chosen Debug] Could not determine text for Chosen deselection on element:", choiceElement);
+                    return;
+                }
+            } else {
+                 console.warn("[MagicTest Chosen Debug] Could not find parent li.search-choice for deselection element:", deselectLink);
+                 return;
             }
+        } else if (selectedLi) {
+            // Case 2: Clicked an item in the results list to SELECT it
+            chosenAction = "magic_choose_select";
+            chosenOptions = selectedLi.textContent || selectedLi.innerText;
+            console.log(`[MagicTest Chosen Debug] Matched: Select Action. Option Text: ${chosenOptions}`);
+        } else if (isOpenClick) {
+            // Case 3: Clicked to OPEN the dropdown
+            chosenAction = "magic_choose_open";
+            console.log("[MagicTest Chosen Debug] Matched: Open Action.");
+            // Target and options remain default (originalSelectId, "")
+        } else if (isSearchInput) {
+            // Case 4: Click on search input (ignore, let keypress/input handle)
+            console.log("[MagicTest Chosen Debug] Click on search input ignored.");
+            return;
         } else {
-             return; // Clicked close icon but couldn't find parent choice element
+            // Unknown click within chosen container
+            console.log("[MagicTest Chosen Debug] Click inside Chosen container did not match known actions.");
+            return;
         }
-      }
-      // --- END: Add Case for Deselection ---
-      // Case 4: Click on search input (often handled by keypress, but good to prevent default handling)
-       else if (element.matches('input.chosen-search-input')) {
-         return; // Let keypress handle search input interaction
-       }
-      // Case 5: Deselect in multi-select (Placeholder - Now Handled Above)
-      // else if (element.matches('ul.chosen-choices li.search-choice a.search-choice-close')) { // Old Placeholder
-      //   console.log("MagicTest: Chosen multi-select deselect detected but not yet handled.");
-      //   return; // Don't record deselection for now
-      // }
 
-      else { // Unknown click within chosen container
-        return; // Click inside chosen, but not on a recognized interactive element
-      }
-
-      // Record the custom chosen action (if action was set)
-      if (action) { // Ensure an action was actually determined
-        console.log("[MagicTest Debug] Recording Chosen action:", {action: action, target: target, options: options }); // Log before push
-        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
-        testingOutput.push({action: action, target: target, options: options });
-        sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-        // Update timestamp only if an action was recorded
-        lastClickTimestamp = Date.now(); // Update timestamp for debounce if needed for Chosen
-        console.log(`[MagicTest Debug] Updated lastClickTimestamp for Chosen action to: ${lastClickTimestamp}`);
-      }
-      return; // Prevent default click handling below for any handled Chosen interaction
+        // Record the custom chosen action (if action was determined)
+        console.log(`[MagicTest Chosen Debug] Action determined: ${chosenAction}`);
+        if (chosenAction) {
+          const eventDataToRecord = {action: chosenAction, target: chosenTarget, options: chosenOptions };
+          console.log("[MagicTest Chosen Debug] Recording Chosen action:", eventDataToRecord);
+          var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+          testingOutput.push(eventDataToRecord);
+          sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+          lastClickTimestamp = Date.now();
+          console.log(`[MagicTest Chosen Debug] Updated lastClickTimestamp for Chosen action to: ${lastClickTimestamp}`);
+        } else {
+           console.log("[MagicTest Chosen Debug] No chosen action determined, nothing recorded.");
+        }
+        return; // Prevent default click handling below for any handled Chosen interaction
+        // --- END: Refactored Chosen Logic --- 
     }
     // --- Chosen.js Handling --- END
 
