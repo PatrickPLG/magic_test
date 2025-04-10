@@ -105,16 +105,17 @@ module MagicTest
             next # Skip this _open event as it's handled by a combined action later
           end
 
-          # puts "[MagicTest Ruby Debug] Processing event #{i}: #{event_data.inspect}"
+          puts "[MagicTest Ruby Debug Loop] Processing event #{i}: #{event_data.inspect}"
           # Call the helper, which now handles combined actions directly based on the action type
           generated_code = generate_action_code(event_data, base_indentation)
+          puts "[MagicTest Ruby Debug Loop] Generated code for event #{i}: #{generated_code.inspect}"
 
           if generated_code.any?
              lines_to_add.concat(generated_code)
              @test_lines_written += generated_code.size
-             # puts "[MagicTest Ruby Debug] Added #{generated_code.size} line(s) from event #{i}. Total written this flush: #{@test_lines_written - initial_lines_written_count}"
-          else
-            # puts "[MagicTest Ruby Debug] No code generated for event #{i}."
+             puts "[MagicTest Ruby Debug Loop] Added #{generated_code.size} line(s) from event #{i}. Current total lines_to_add: #{lines_to_add.count}"
+           else
+             puts "[MagicTest Ruby Debug Loop] No code generated for event #{i}."
           end
         end
         # --------------------------
