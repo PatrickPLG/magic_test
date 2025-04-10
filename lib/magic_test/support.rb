@@ -122,7 +122,7 @@ module MagicTest
         if lines_to_add.any?
              puts "[MagicTest Ruby Debug] Adding #{lines_to_add.count} total line(s) to the file."
              current_chunks[0] = [] unless current_chunks[0]
-             current_chunks.first.concat(lines_to_add.map { |l| l + "\\n" }) # Add newline to each generated line
+             current_chunks.first.concat(lines_to_add.map { |l| l + "\n" })
 
              contents_string = current_chunks.flatten.join
              # --- Add logging for final content --- #
