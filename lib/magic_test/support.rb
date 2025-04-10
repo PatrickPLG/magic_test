@@ -238,6 +238,8 @@ module MagicTest
       when 'select'
         code << "#{base_indentation}select '#{options}', from: '#{target}'"
         # puts "[MagicTest Ruby Debug] Generating select."
+      when 'magic_hover'
+        code << "#{base_indentation}find(#{target}).hover" # Target includes quotes from JS
       # --- Chosen.js Specific Actions ---
       when 'magic_choose_open'
         # This only runs if it wasn't skipped by the lookahead in flush

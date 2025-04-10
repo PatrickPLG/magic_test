@@ -266,6 +266,99 @@
   const CLICK_DEBOUNCE_MS = 150; // Ignore clicks within 150ms of the last recorded one
   // --- END: Debounce logic variables ---
 
+  // Global variable for hover debounce timer
+  let hoverTimeoutId = null;
+  const hoverDebounceTime = 400; // ms
+
+  // --- START: New Hover Listener ---
+  function mouseoverFunction(evt) {
+    // Clear any existing debounce timer
+    clearTimeout(hoverTimeoutId);
+
+    const element = evt.target;
+
+    // Basic filtering (ignore document itself, etc.)
+    if (!element || element === document.body || element === document.documentElement) {
+      return;
+    }
+
+    // --- Element Handling (similar to click, simplify for now) ---
+    let targetElement = element;
+    // Handle SVG paths/elements: Find the parent <svg>
+    if (element.tagName === 'path' || element.closest('svg')) {
+        targetElement = element.closest('svg');
+        if (!targetElement) return; // Should not happen if closest worked
+    }
+    // TODO: Add more specific element checks if needed, like ignoring text nodes directly
+
+    // --- Heuristic: Debounce + Child Visibility Check ---
+    // Get initial visibility state of direct children
+    const initialChildVisibility = {};
+    if (targetElement.children) {
+      for (let i = 0; i < targetElement.children.length; i++) {
+        const child = targetElement.children[i];
+        const style = window.getComputedStyle(child);
+        initialChildVisibility[i] = (style.display === 'none' || style.visibility === 'hidden');
+      }
+    }
+
+    hoverTimeoutId = setTimeout(() => {
+      let significantHover = false;
+      // Check child visibility again after debounce
+      if (targetElement.children) {
+        for (let i = 0; i < targetElement.children.length; i++) {
+          const child = targetElement.children[i];
+          const style = window.getComputedStyle(child);
+          const isHiddenNow = (style.display === 'none' || style.visibility === 'hidden');
+          // If a child WAS hidden and is NOT hidden now, consider it significant
+          if (initialChildVisibility[i] && !isHiddenNow) {
+            significantHover = true;
+            break; // Found one significant change, no need to check others
+          }
+        }
+      }
+
+      if (significantHover) {
+        // console.log('[MagicTest Hover Debug] Significant hover detected on:', targetElement);
+        // Use findBestSelector to get the selector for the *hovered* element
+        let selectorResult = findBestSelector(targetElement);
+        let recordedData = null;
+
+        if (selectorResult.type === 'global') {
+            recordedData = {
+                action: 'magic_hover',
+                target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Escaped selector
+                options: ""
+            };
+        } else if (selectorResult.type === 'scoped') {
+            // For hover, maybe we prefer global selectors? Or maybe within makes sense?
+            // Let's try global first, but keep scoped logic structure.
+             recordedData = {
+                action: 'magic_hover',
+                target: `'${selectorResult.selector.replace(/\'/g, "\\\'")}'`, // Use combined global selector even if scoped found initially
+                options: ""
+            };
+             console.warn("[MagicTest Hover Debug] Scoped selector found for hover, using global equivalent: ", selectorResult.selector );
+
+        } else {
+            console.warn("[MagicTest Hover Debug] Could not find suitable selector for hover target:", targetElement);
+        }
+
+        if (recordedData) {
+          // console.log('[MagicTest Hover Debug] Recording hover action:', recordedData);
+          var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput") || '[]');
+          // Avoid recording consecutive duplicate hovers on the same target
+          const lastEvent = testingOutput[testingOutput.length - 1];
+          if (!lastEvent || !(lastEvent.action === 'magic_hover' && lastEvent.target === recordedData.target)) {
+               testingOutput.push(recordedData);
+               sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+          }
+        }
+      }
+    }, hoverDebounceTime);
+  }
+  // --- END: New Hover Listener ---
+
   function clickFunction(event) {
     // --- START: Filter non-trusted events ---
     // Ignore clicks not directly initiated by the user (e.g., element.click())
@@ -625,6 +718,18 @@
       testingOutput.push({action: action, target: target, options: options});
     }
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+  }
+
+  function addListeners() {
+    document.addEventListener('click', clickFunction, true);
+    document.addEventListener('keypress', keypressFunction, true);
+    document.addEventListener('keydown', keyDownFunction, true);
+    document.addEventListener('change', changeFunction, true);
+    // --- START: Add hover listener ---
+    document.addEventListener('mouseover', mouseoverFunction, true);
+    // We might need mouseout/mouseleave to clear the timeout if the mouse leaves *before* the debounce triggers
+    document.addEventListener('mouseout', () => clearTimeout(hoverTimeoutId), true);
+    // --- END: Add hover listener ---
   }
 
 </script>
