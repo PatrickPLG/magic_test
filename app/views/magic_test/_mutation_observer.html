@@ -1,36 +1,35 @@
 <script>
 
-  function initializeMutationObserver(){
-    window.mutationObserver = new MutationObserver(function(mutations) {
-      console.log("Mutation observed")
+  // Initialize mutation observer with arrow function
+  const initializeMutationObserver = () => {
+    window.mutationObserver = new MutationObserver((mutations) => {
+      console.log("Mutation observed");
       if (!window.target) {
         console.log("There is no window.target element. Quitting the mutation callback function");
         return;
       }
-      var options = "";
-      var targetClass = window.target.classList[0] ? `.${window.target.classList[0]}` : ""
-      var text = window.target.innerText ? `', text: '${window.target.innerText}` : ""
-      var action = `${finderForElement(window.target)}.hover`;
-      // var action = `find('${window.target.localName}${targetClass}${text}').hover`;
-      var target = "";
-      var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-      testingOutput.push({action: action, target: target, options: options});
+      const options = "";
+      const targetClass = window.target.classList[0] ? `.${window.target.classList[0]}` : "";
+      const text = window.target.innerText ? `', text: '${window.target.innerText}` : "";
+      const action = `${finderForElement(window.target)}.hover`;
+      const target = "";
+      const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+      testingOutput.push({action, target, options});
       sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
     });
-    
-    
-    
-  }
+  };
 
-  function mutationStart(evt) {
+  // Async mutation start handler
+  const mutationStart = async (evt) => {
     window.target = evt.target;
-    const opts = {attributes: true, characterData: true, childList: true, subtree: true}
+    const opts = {attributes: true, characterData: true, childList: true, subtree: true};
     window.mutationObserver.observe(document.documentElement, opts);
-  }
+  };
 
-  function mutationEnd () {
+  // Mutation end handler
+  const mutationEnd = () => {
     window.mutationObserver.disconnect();
-  }
+  };
 
 
 </script>

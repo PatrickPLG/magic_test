@@ -1,8 +1,37 @@
 <script>
-  // document.addEventListener('keydown', function(e){keyDownFunction(e)}, true);
-  // document.addEventListener('keyup', function(e){keyUpFunction(e)}, true);
-  document.addEventListener('keypress', function(e){keypressFunction(e)});
-  document.addEventListener('mouseover', function(evt){mutationStart(evt)}, true);
-  document.addEventListener('mouseover', function(){mutationEnd()}, false);
-  document.addEventListener('click', function(event){clickFunction(event)});
+  // Event listeners with arrow functions for better compatibility
+  // document.addEventListener('keydown', (e) => keyDownFunction(e), true);
+  // document.addEventListener('keyup', (e) => keyUpFunction(e), true);
+  document.addEventListener('keypress', (e) => keypressFunction(e));
+  document.addEventListener('mouseover', (evt) => mutationStart(evt), true);
+  document.addEventListener('mouseover', () => mutationEnd(), false);
+  document.addEventListener('click', (event) => clickFunction(event));
+
+  // Add change listener for select elements, Chosen, and date pickers
+  document.addEventListener('change', (evt) => changeFunction(evt));
+
+  // Add support for dynamically loaded content (for SPA and AJAX)
+  const observeDOM = (() => {
+    const MutationObserver = window.MutationObserver || window.WebKitMutationObserver;
+
+    return (callback) => {
+      if (!MutationObserver) return;
+
+      const obs = new MutationObserver((mutations, observer) => {
+        if (mutations[0].addedNodes.length || mutations[0].removedNodes.length) {
+          callback();
+        }
+      });
+
+      obs.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    };
+  })();
+
+  // Re-attach listeners when new content is loaded
+  observeDOM(() => {
+    console.log('🪄 Magic Test: New content detected, listeners are active');
+  });
 </script>

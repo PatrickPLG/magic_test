@@ -1,90 +1,89 @@
 <script>
-  function ready(fn) {
+  // Modern arrow function for ready handler
+  const ready = (fn) => {
     if (document.readyState !== 'loading'){
       fn();
     } else {
       document.addEventListener('DOMContentLoaded', fn);
     }
-  }
+  };
 
-  ready(function() {
+  ready(() => {
     enableKeyboardShortcuts();
   });
 
-
-  function enableKeyboardShortcuts() {
-    // Ctrl+A to generate an assertion
-    function keydown(event) {
+  // Main keyboard shortcut enabler with arrow functions
+  const enableKeyboardShortcuts = () => {
+    // Ctrl+Shift+A to generate an assertion
+    const keydown = (event) => {
       if (event.ctrlKey && event.shiftKey && event.key === 'A') {
         event.preventDefault();
         generateAssertion();
       }
-    }
+    };
 
     document.addEventListener('keydown', keydown, false);
 
-    function generateAssertion() {
-      var text = selectedText().trim();
+    const generateAssertion = () => {
+      const text = selectedText().trim();
       if (text.length > 0) {
-        var action = assertMethod() + text.replace("'", "\\\'") +  "'";
-        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-        var target = "";
-        var options = "";
-        var accept = "You selected:\n\r" + text + "\n\rOk: Type `flush` into debugger console to add to test.\nCancel: To select new text."
+        const action = assertMethod() + text.replace("'", "\\'") + "'";
+        const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+        const target = "";
+        const options = "";
+        const accept = "You selected:\n\r" + text + "\n\rOk: Type `flush` into debugger console to add to test.\nCancel: To select new text.";
         if (window.confirm(accept)) {
-          testingOutput.push({action: action, target: target, options: options});
+          testingOutput.push({action, target, options});
           sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-        }
-        else {
-          console.log("Assertion was not generated.")
+        } else {
+          console.log("Assertion was not generated.");
         }
       }
-    }
+    };
 
     // Right-click to generate an assertion
-    function riteklick(event) {
-      if (event.button == 2) {
-        window.addEventListener("contextmenu", e => e.preventDefault());
+    const riteklick = (event) => {
+      if (event.button === 2) {
+        window.addEventListener("contextmenu", (e) => e.preventDefault());
         setupAssertion(event);
       }
-    }
+    };
 
     document.addEventListener('mousedown', riteklick);
 
-    function setupAssertion(event) {
-      var text = selectedText().trim();
+    const setupAssertion = (event) => {
+      const text = selectedText().trim();
       if (text.length > 0) {
-        var action = assertMethod() + text.replace("'", "\\\'") +  "'";
-        var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-        var target = "";
-        var options = "";
-        var accept = "You selected:\n\r" + text + "\n\rOk: Type `flush` into debugger console to add to test.\nCancel: To select new text."
+        const action = assertMethod() + text.replace("'", "\\'") + "'";
+        const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+        const target = "";
+        const options = "";
+        const accept = "You selected:\n\r" + text + "\n\rOk: Type `flush` into debugger console to add to test.\nCancel: To select new text.";
         if (window.confirm(accept)) {
-          testingOutput.push({action: action, target: target, options: options});
+          testingOutput.push({action, target, options});
           sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-        }
-        else {
-          console.log("Assertion was not generated.")
+        } else {
+          console.log("Assertion was not generated.");
         }
       }
-    }
+    };
 
-    function assertMethod(){
+    const assertMethod = () => {
       <%- if defined? RSpec %>
-        return "expect(page).to have_content '"
+        return "expect(page).to have_content '";
       <%- else %>
-        return "assert page.has_content? '"
+        return "assert page.has_content? '";
       <%- end %>
-    }
+    };
 
-    function selectedText() {
-      var text = "";
+    const selectedText = () => {
+      let text = "";
       if (window.getSelection) {
-          text = window.getSelection().toString();
-      } else if (document.selection && document.selection.type != "Control") {
-          text = document.selection.createRange().text;
+        text = window.getSelection().toString();
+      } else if (document.selection && document.selection.type !== "Control") {
+        text = document.selection.createRange().text;
       }
       return text;
-    }
-  }
+    };
+  };
 </script>

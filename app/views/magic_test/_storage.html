@@ -1,9 +1,30 @@
 <script>
-  function initializeStorage(){
-    if (sessionStorage.getItem("testingOutput") == null) {
+  // Support both traditional and arrow function syntax
+  const initializeStorage = () => {
+    if (sessionStorage.getItem("testingOutput") === null) {
       sessionStorage.setItem("testingOutput", JSON.stringify([]));
     }
-  }
+  };
 
+  // Also support async operations for future-proofing
+  const getTestingOutput = async () => {
+    try {
+      const output = sessionStorage.getItem("testingOutput");
+      return output ? JSON.parse(output) : [];
+    } catch (error) {
+      console.error("Error getting testing output:", error);
+      return [];
+    }
+  };
+
+  const setTestingOutput = async (output) => {
+    try {
+      sessionStorage.setItem("testingOutput", JSON.stringify(output));
+      return true;
+    } catch (error) {
+      console.error("Error setting testing output:", error);
+      return false;
+    }
+  };
 
 </script>

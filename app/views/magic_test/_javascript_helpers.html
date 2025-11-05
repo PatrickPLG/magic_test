@@ -1,133 +1,272 @@
 <script text="text/javascript">
 
-  ready(function() {
+  // Initialize with arrow function
+  ready(() => {
     console.log("🪄 Magic Test activated in the browser!")
     initializeStorage();
     initializeMutationObserver();
   });
 
-  function clickFunction(event) {
-    var element = event.target
-    var tagName = element.tagName
-    var action = ""
-    var target = ""
-    var options = ""
-    if (tagName == "BUTTON" || tagName == "A" || (tagName == "INPUT" && element.type == 'submit')) {
-      action = "click_on"
-      target = element.value || element.text
+  // Helper to detect special UI components
+  const isChosenSelect = (element) => {
+    return element.classList?.contains('chosen-container') ||
+           element.closest?.('.chosen-container') !== null ||
+           element.classList?.contains('chosen-select');
+  };
+
+  const isFlatpickrInput = (element) => {
+    return element.classList?.contains('flatpickr-input') ||
+           element._flatpickr !== undefined ||
+           element.closest?.('.flatpickr-calendar') !== null;
+  };
+
+  const isDatepickerInput = (element) => {
+    return element.classList?.contains('datepicker') ||
+           element.classList?.contains('hasDatepicker') ||
+           element.type === 'date';
+  };
+
+  const isSelect2 = (element) => {
+    return element.classList?.contains('select2') ||
+           element.closest?.('.select2-container') !== null;
+  };
+
+  // Handle Chosen select interaction
+  const handleChosenSelect = async (element) => {
+    const chosenContainer = element.closest('.chosen-container') || element;
+    const originalSelect = chosenContainer.previousElementSibling;
+    if (originalSelect?.tagName === 'SELECT') {
+      const selectedOption = originalSelect.options[originalSelect.selectedIndex];
+      return {
+        action: 'select',
+        target: `'${selectedOption?.text?.trim() || ''}'`,
+        options: `, from: '${originalSelect.name || originalSelect.id}'`
+      };
+    }
+    return null;
+  };
+
+  // Handle flatpickr date picker
+  const handleFlatpickr = async (element) => {
+    const flatpickrInstance = element._flatpickr;
+    if (flatpickrInstance) {
+      const selectedDate = flatpickrInstance.selectedDates[0];
+      if (selectedDate) {
+        const label = element.labels?.[0]?.textContent || element.placeholder || element.name;
+        return {
+          action: 'fill_in',
+          target: `'${label}'`,
+          options: `, with: '${selectedDate.toLocaleDateString()}'`
+        };
+      }
+    }
+    return null;
+  };
+
+  // Main click handler with arrow function
+  const clickFunction = async (event) => {
+    const element = event.target;
+    const tagName = element.tagName;
+    let action = "";
+    let target = "";
+    let options = "";
+
+    // Check for special UI components first
+    if (isChosenSelect(element)) {
+      const result = await handleChosenSelect(element);
+      if (result) {
+        const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+        testingOutput.push(result);
+        sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+        return;
+      }
+    }
+
+    if (isSelect2(element)) {
+      const select2Container = element.closest('.select2-container');
+      const select2Input = select2Container?.previousElementSibling;
+      if (select2Input?.tagName === 'SELECT') {
+        const selectedOption = select2Input.options[select2Input.selectedIndex];
+        action = 'select';
+        target = `'${selectedOption?.text?.trim() || ''}'`;
+        options = `, from: '${select2Input.name || select2Input.id}'`;
+      }
+    } else if (tagName === "BUTTON" || tagName === "A" || (tagName === "INPUT" && element.type === 'submit')) {
+      action = "click_on";
+      target = element.value || element.text;
       if (!target) {
         return;
       }
-      target = "\'" + target.trim().replace("'", "\\\'") + "\'"
-    } else if (tagName == "INPUT") {
-      let ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search']
+      target = "'" + target.trim().replace("'", "\\'") + "'";
+    } else if (tagName === "INPUT") {
+      const ignoreType = ['text', 'password', 'date', 'email', 'month', 'number', 'search'];
       if (ignoreType.includes(element.type)) {
         return;
       }
-      var path = getPathTo(element)
-      action = `find(:xpath, '${path}').click`
+      const path = getPathTo(element);
+      action = `find(:xpath, '${path}').click`;
+    } else if (tagName === "SELECT") {
+      // Handle native select elements
+      const selectedOption = element.options[element.selectedIndex];
+      action = 'select';
+      target = `'${selectedOption?.text?.trim() || ''}'`;
+      options = `, from: '${element.name || element.id}'`;
     } else {
       return;
     }
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-    testingOutput.push({action: action, target: target, options: options });
+
+    const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    testingOutput.push({action, target, options});
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
   };
 
-  function keypressFunction(evt) {
+  // Keypress handler with arrow function
+  const keypressFunction = (evt) => {
     evt = evt || window.event;
-    var charCode = evt.keyCode || evt.which;
-    var charStr = String.fromCharCode(charCode);
+    const charCode = evt.keyCode || evt.which;
+    const charStr = String.fromCharCode(charCode);
+
+    // Handle flatpickr inputs
+    if (isFlatpickrInput(evt.target)) {
+      return; // Let flatpickr handle its own events
+    }
+
     if (!evt.target.labels) {
       return;
     }
-    var label = evt.target.labels[0].textContent;
-    var text = (evt.target.value + charStr).trim().replace("'", "\\\'");
-    var action = "fill_in";
-    var target = evt.target.labels[0].textContent;
-    var options = ", with: '" + text + "'";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-    var lastAction = testingOutput[testingOutput.length - 1];
-    if (lastAction && lastAction.action == action && lastAction.target == "\'" + target + "\'") {
+
+    const label = evt.target.labels[0].textContent;
+    const text = (evt.target.value + charStr).trim().replace("'", "\\'");
+    const action = "fill_in";
+    const target = evt.target.labels[0].textContent;
+    const options = ", with: '" + text + "'";
+    const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    const lastAction = testingOutput[testingOutput.length - 1];
+
+    if (lastAction && lastAction.action === action && lastAction.target === "'" + target + "'") {
       lastAction.options = options;
     } else {
-      testingOutput.push({action: action, target: "\'" + target + "\'", options: options});
+      testingOutput.push({action, target: "'" + target + "'", options});
     }
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-  }
+  };
 
-  function keyDownFunction(evt){
+  // Keydown handler with arrow function
+  const keyDownFunction = (evt) => {
     if (evt.target.labels) {
       return;
     }
+
+    // Handle flatpickr navigation
+    if (isFlatpickrInput(evt.target)) {
+      return;
+    }
+
     evt = evt || window.event;
-    var charCode = evt.keyCode || evt.which;
-    var charStr = capybaraFromCharCode(charCode);
-    var letter = evt.key == "'" ? "\\\'" : evt.key;
-    var tagName = evt.target.tagName.toLowerCase();
-    var action = finderForElement(evt.target) + "." // `find('${tagName}').`;
-    var target = ""
+    const charCode = evt.keyCode || evt.which;
+    const charStr = capybaraFromCharCode(charCode);
+    const letter = evt.key === "'" ? "\\'" : evt.key;
+    const tagName = evt.target.tagName.toLowerCase();
+    const action = finderForElement(evt.target) + ".";
+    let target = "";
+
     if (charStr) {
       target = `send_keys(${charStr})`;
     } else {
       target = `send_keys('${letter}')`;
     }
-    var options = "";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-    var lastAction = testingOutput[testingOutput.length - 1];
-    // If the last key pressed was enter, always start a new action (otherwise with trix mentions, it happens too fast and we don't actually select the mentioned user correctly.)
-    if (lastAction && lastAction.target.substr(lastAction.target.length - 7 , 6) == ":enter") {
+
+    const options = "";
+    const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    let lastAction = testingOutput[testingOutput.length - 1];
+
+    // If the last key pressed was enter, always start a new action
+    if (lastAction && lastAction.target.substr(lastAction.target.length - 7, 6) === ":enter") {
       lastAction = null;
     }
-    if (lastAction && lastAction.action == action && lastAction.target.substr(0,9) == 'send_keys') {
+
+    if (lastAction && lastAction.action === action && lastAction.target.substr(0, 9) === 'send_keys') {
       if (charStr) {
-        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', ' + charStr + ')'
+        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', ' + charStr + ')';
       } else {
-        if (lastAction.target.substr(lastAction.target.length - 2, 1) == "'") {
-          lastAction.target = lastAction.target.substr(0, lastAction.target.length - 2) + letter + '\'' + ')'
+        if (lastAction.target.substr(lastAction.target.length - 2, 1) === "'") {
+          lastAction.target = lastAction.target.substr(0, lastAction.target.length - 2) + letter + "'" + ')';
         } else {
-          lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', \'' + letter + '\'' + ')'
+          lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ", '" + letter + "'" + ')';
         }
       }
     } else {
-      testingOutput.push({action: action, target: target, options: options});
+      testingOutput.push({action, target, options});
     }
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-  }
+  };
 
-  function keyUpFunction(evt){
+  // Keyup handler with arrow function
+  const keyUpFunction = (evt) => {
     if (evt.target.labels) {
       return;
     }
 
     evt = evt || window.event;
-    var charCode = evt.keyCode || evt.which;
-    var charStr = capybaraKeyUpFromCharCode(charCode);
+    const charCode = evt.keyCode || evt.which;
+    const charStr = capybaraKeyUpFromCharCode(charCode);
+
     if (!charStr) {
       return;
     }
-    var letter = String.fromCharCode(charCode);
-    var tagName = evt.target.tagName.toLowerCase();
-    var action = `find('${tagName}').`;
-    var target = ""
+
+    const letter = String.fromCharCode(charCode);
+    const tagName = evt.target.tagName.toLowerCase();
+    const action = `find('${tagName}').`;
+    let target = "";
+
     if (charStr) {
       target = `send_keys(${charStr})`;
     } else {
       target = `send_keys('${letter}')`;
     }
-    var options = "";
-    var testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
-    var lastAction = testingOutput[testingOutput.length - 1];
-    if (lastAction && lastAction.action == action && lastAction.target.substr(0,9) == 'send_keys') {
+
+    const options = "";
+    const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+    const lastAction = testingOutput[testingOutput.length - 1];
+
+    if (lastAction && lastAction.action === action && lastAction.target.substr(0, 9) === 'send_keys') {
       if (charStr) {
-        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', ' + charStr + '' + ')'
+        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', ' + charStr + ')';
       } else {
-        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ', \'' + letter + '\'' + ')'
+        lastAction.target = lastAction.target.substr(0, lastAction.target.length - 1) + ", '" + letter + "'" + ')';
       }
     } else {
-      testingOutput.push({action: action, target: target, options: options});
+      testingOutput.push({action, target, options});
     }
     sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
-  }
+  };
+
+  // Change event handler for select elements (including Chosen)
+  const changeFunction = (evt) => {
+    const element = evt.target;
+
+    if (element.tagName === 'SELECT') {
+      // Handle regular and Chosen selects
+      const selectedOption = element.options[element.selectedIndex];
+      const action = 'select';
+      const target = `'${selectedOption?.text?.trim() || ''}'`;
+      const options = `, from: '${element.name || element.id}'`;
+
+      const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+      testingOutput.push({action, target, options});
+      sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+    } else if (isFlatpickrInput(element) || isDatepickerInput(element)) {
+      // Handle date pickers
+      const label = element.labels?.[0]?.textContent || element.placeholder || element.name || element.id;
+      const action = 'fill_in';
+      const target = `'${label}'`;
+      const options = `, with: '${element.value}'`;
+
+      const testingOutput = JSON.parse(sessionStorage.getItem("testingOutput"));
+      testingOutput.push({action, target, options});
+      sessionStorage.setItem("testingOutput", JSON.stringify(testingOutput));
+    }
+  };
 
 </script>

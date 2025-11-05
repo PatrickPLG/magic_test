@@ -1,6 +1,7 @@
 <script>
-    function capybaraFromCharCode(charCode) {
-      codes = {
+    // Arrow function with const for better scoping
+    const capybaraFromCharCode = (charCode) => {
+      const codes = {
         8  :  ':backspace',
         9  :  ':tab',
         13 :  ':enter',
@@ -33,18 +34,19 @@
         121:  ':f10',
         122:  ':f11',
         123:  ':f12',
-      }
+      };
       return codes[charCode];
-    }
+    };
 
-    function capybaraKeyUpFromCharCode(charCode) {
-      codes = {
+    // Arrow function for key up events
+    const capybaraKeyUpFromCharCode = (charCode) => {
+      const codes = {
         16 :  ':shift',
         17 :  ':control',
         18 :  ':alt',
         91 :  ':command',
-      }
+      };
       return codes[charCode];
-    }
+    };
 
 </script>
