@@ -1,0 +1,12 @@
+.dropdown
+  %button#loginDropDownBtn.btn.btn-outline-primary.dropdown-toggle{type: "button", "data-bs-toggle" => "dropdown", "data-bs-auto-close" => "false", "aria-expanded" => "false"}
+    = t("nav.login")
+  .dropdown-menu.dropdown-menu-end.p-3{"aria-labelledby" => "loginDropDownBtn"}
+    = form_for(User.new, as: :user, url: user_session_path, html: {id: "login-form"}) do |f|
+      .mb-2
+        = f.label :email, "E-mail", class: "form-label"
+        = f.email_field :email, class: "form-control"
+      .mb-2
+        = f.label :password, "Adgangskode", class: "form-label"
+        = f.password_field :password, class: "form-control"
+      = f.submit t("nav.login"), class: "btn btn-primary"

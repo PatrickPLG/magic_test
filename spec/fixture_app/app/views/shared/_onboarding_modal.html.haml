@@ -1,0 +1,10 @@
+#onboarding-modal.modal.fade{tabindex: "-1", role: "dialog", "data-auto-open" => "true"}
+  .modal-dialog
+    .modal-content
+      .modal-header
+        %h5.modal-title= t("onboarding.title")
+      .modal-body
+        %p= t("onboarding.body")
+      .modal-footer
+        = link_to t("onboarding.later"), "#", class: "btn btn-link", "data-bs-dismiss" => "modal"
+        = link_to t("onboarding.start"), root_path(guide: 1), class: "btn btn-primary"

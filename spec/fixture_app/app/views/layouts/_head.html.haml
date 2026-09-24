@@ -1,0 +1,22 @@
+%meta{charset: "utf-8"}
+%meta{name: "viewport", content: "width=device-width, initial-scale=1"}
+%title= content_for?(:title) ? yield(:title) : "Studiz"
+= csrf_meta_tags
+%link{rel: "stylesheet", href: "/vendor/bootstrap/bootstrap.min.css"}
+%link{rel: "stylesheet", href: "/vendor/chosen/chosen.min.css"}
+%link{rel: "stylesheet", href: "/vendor/flatpickr/flatpickr.min.css"}
+%link{rel: "stylesheet", href: "/vendor/trix/trix.css"}
+%link{rel: "stylesheet", href: "/vendor/cropper/cropper.min.css"}
+%link{rel: "stylesheet", href: "/css/studiz.css"}
+%script{src: "/vendor/jquery/jquery.min.js"}
+%script{src: "/vendor/rails-ujs/rails-ujs.js"}
+%script{src: "/vendor/bootstrap/bootstrap.bundle.min.js"}
+%script{src: "/vendor/chosen/chosen.jquery.min.js"}
+%script{src: "/vendor/flatpickr/flatpickr.min.js"}
+%script{src: "/vendor/flatpickr/da.js"}
+%script{src: "/vendor/trix/trix.js"}
+%script{src: "/vendor/cropper/cropper.min.js"}
+%script{src: "/js/i18n.js"}
+%script{src: "/js/studiz.js"}
+-# Studiz layouts still contain this line; the gem ships a no-op shim.
+= render "magic_test/support" if Rails.env.test?

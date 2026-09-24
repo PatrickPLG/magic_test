@@ -1,0 +1,17 @@
+- content_for(:nav) do
+  %ul.navbar-nav
+    %li.nav-item= link_to t("nav.students"), institution_students_path(@institution), class: "nav-link"
+    %li.nav-item= link_to t("nav.events"), institution_events_path(@institution), class: "nav-link active"
+%h1= t("events.index.title")
+= link_to t("events.index.new"), new_institution_event_path(@institution), class: "btn btn-primary mb-3"
+- if @events.empty?
+  %p.text-muted= t("events.index.empty")
+%table.table#events-table
+  %tbody
+    - @events.each do |event|
+      %tr{id: "event_#{event.id}"}
+        %td= event.name
+        %td= event.starts_at&.strftime("%d/%m-%Y %H:%M")
+        %td
+          = link_to "Rediger", edit_institution_event_path(@institution, event), class: "btn btn-sm btn-outline-primary"
+          = link_to "Slet", institution_event_path(@institution, event), method: :delete, data: {confirm: "Slet arrangementet \"#{event.name}\"?"}, class: "btn btn-sm btn-outline-danger"

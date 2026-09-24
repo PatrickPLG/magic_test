@@ -1,0 +1,8 @@
+.ticket-type-fields.row.align-items-end.mb-2
+  .col
+    = f.input :name
+  .col
+    = f.input :price
+  .col-auto
+    = f.hidden_field :_destroy
+    = link_to t("events.form.remove_ticket_type"), "#", class: "btn btn-outline-danger btn-sm js-remove-ticket-type"

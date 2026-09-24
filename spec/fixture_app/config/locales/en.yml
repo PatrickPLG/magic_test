@@ -1,0 +1,68 @@
+en:
+  activerecord:
+    attributes:
+      discount:
+        name_da: "Name"
+      events/event:
+        name: "Name"
+        description: "Description"
+        terms_accepted: "I accept the Studiz terms"
+        account_number: "Account number"
+        starts_at: "Start time"
+        category: "Category"
+      student:
+        first_name: "First name"
+        last_name: "Last name"
+  helpers:
+    submit:
+      events_event:
+        create: "Save event"
+        update: "Save event"
+  nav:
+    events: "Events"
+    students: "Students"
+    discounts: "Discounts"
+    messages: "Messages"
+    profile: "My profile"
+    login: "Log in"
+  search:
+    no_results_found: "No results found"
+  events:
+    index:
+      title: "All events"
+      new: "Create event"
+      empty: "There are no events yet"
+    form:
+      general: "General"
+      organiser: "Organiser"
+      tickets: "Tickets"
+      add_ticket_type: "Add ticket type"
+      remove_ticket_type: "Remove"
+    create:
+      success: "Event created"
+    update:
+      success: "Event saved"
+    show:
+      signup: "Sign up"
+      continue_to_payment: "Continue to payment"
+  home:
+    index:
+      title: "Home"
+      welcome: "Welcome, %{name}"
+      cta: "See discounts"
+  onboarding:
+    title: "Welcome to Studiz"
+    body: "We made a short guide for you."
+    later: "Later"
+    start: "Start the guide"
+  cookies:
+    title: "We use cookies"
+    accept: "Accept all"
+    necessary: "Only necessary"
+  students:
+    index:
+      title: "Students"
+  simple_form:
+    required:
+      text: "required"
+      mark: "*"

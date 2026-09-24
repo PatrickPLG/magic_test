@@ -1,0 +1,5 @@
+da:
+  activerecord:
+    attributes:
+      discount:
+        name_da: "Rabatnavn"

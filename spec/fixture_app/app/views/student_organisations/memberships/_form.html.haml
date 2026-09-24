@@ -1,0 +1,12 @@
+.modal-header
+  %h5.modal-title= t("memberships.index.add")
+  %button.btn-close{type: "button", "data-bs-dismiss" => "modal", "aria-label" => "Close"}
+= simple_form_for(@membership, url: student_organisation_student_organisation_memberships_path, remote: true, html: {id: "membership-form"}) do |f|
+  .modal-body
+    = f.error_notification
+    = f.input :name, required: true
+    = f.input :email, required: true
+    = f.input :membership_type, collection: membership_type_options, include_blank: false
+  .modal-footer
+    %button.btn.btn-secondary{type: "button", "data-bs-dismiss" => "modal"} Annuller
+    = f.button :submit, t("helpers.submit.student_organisation_membership.create"), class: "btn btn-primary"

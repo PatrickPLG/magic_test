@@ -1,0 +1,5 @@
+%tr{id: "membership_#{membership.id}"}
+  %td= membership.name
+  %td= membership.email
+  %td= t("memberships.types.#{membership.membership_type}")
+  %td= link_to t("memberships.index.remove"), student_organisation_student_organisation_membership_path(membership), method: :delete, data: {confirm: "Fjern #{membership.name}?"}, class: "btn btn-sm btn-outline-danger"

@@ -1,0 +1,22 @@
+da:
+  routes:
+    institutions: institutioner
+    students: studerende
+    events: arrangementer
+    providers: udbydere
+    admin: admin
+    discounts: rabatter
+    student_organisation: studie-organisation
+    student_organisation_memberships: medlemmer
+    user_messages: beskeder
+    invoices: fakturaer
+    profile: profil
+    preview: forhaandsvisning
+    preview_frame: forhaandsvisning-ramme
+    terms: vilkaar
+    double_render: dobbelt
+    new: ny
+    edit: rediger
+    send_reminder: send-paamindelse
+    archive: arkiver
+    confirm_archive: bekraeft-arkivering

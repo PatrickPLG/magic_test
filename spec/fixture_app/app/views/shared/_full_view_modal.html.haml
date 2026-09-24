@@ -1,0 +1,10 @@
+#full-view-modal.modal.fade{tabindex: "-1", role: "dialog"}
+  .modal-dialog.min-vh-100.w-50.start-50.m-0.mw-100.modal-dialog-scrollable
+    .modal-content.modal-white
+      .modal-header
+        %button.btn-close{"aria-label" => "Close", "data-bs-dismiss" => "modal", type: "button"}
+      .modal-body
+        .d-flex.justify-content-center
+          .d-flex.spinner-border{role: "status"}
+          .visually-hidden
+            #load= "Loading..."

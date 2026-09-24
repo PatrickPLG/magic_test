@@ -1,0 +1,3 @@
+$("#ajax-modal").modal("hide");
+$("#memberships-table tbody").append("<%= j render("membership_row", membership: @membership) %>");
+window.showToast("<%= j t("memberships.create.success") %>");

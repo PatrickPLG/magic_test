@@ -1,0 +1,21 @@
+- content_for(:title, t("home.index.title"))
+%h1= t("home.index.title")
+- if current_user
+  %p.lead= t("home.index.welcome", name: current_user.email)
+%p
+  = link_to t("home.index.cta"), root_path(anchor: "discounts"), class: "btn btn-primary"
+  = link_to "Læs Studiz' vilkår ", terms_path, class: "btn btn-link"
+  = link_to "Se \"Fest\" arrangementer", root_path(filter: "fest"), class: "btn btn-link"
+#discounts.row.mt-4
+  - @discounts.each do |discount|
+    .col-md-4
+      .card.discount-card{id: "discount-card-#{discount.id}", onclick: "event.stopPropagation(); this.classList.toggle('border-primary');"}
+        .card-body
+          %h5.card-title= discount.name_da
+          %span.badge.bg-success= t("discounts.statuses.#{discount.status}")
+          = link_to "Se rabat", root_path(discount: discount.id), class: "stretched-link-not"
+- if @messages.any?
+  %h2.mt-4= t("messages.index.title")
+  %ul#message-list
+    - @messages.each do |m|
+      %li= m.body

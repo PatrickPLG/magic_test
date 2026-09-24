@@ -1,0 +1,22 @@
+-# Studiz `_cover_image_upload.html.haml`: visually hidden file input whose id contains the record id.
+- input_id = "cover_image_#{object.class.name.underscore}_#{object.id || "new"}_#{field}"
+.cover-image-upload-wrapper.mb-3
+  = f.label field, class: "form-label"
+  %div
+    - if object.public_send(field).present?
+      %span.current-cover-image.badge.bg-light.text-dark= object.public_send(field)
+  = f.file_field field, id: input_id, class: "cover-image-upload visually-hidden", accept: "image/*", "data-cropper-target" => "#image-cropper-modal"
+  = label_tag input_id, "Vælg billede", class: "btn btn-outline-secondary btn-sm"
+  %small.form-text= t("simple_form.hints.discount.cover_image")
+#image-cropper-modal.modal.fade{tabindex: "-1", role: "dialog"}
+  .modal-dialog.modal-lg
+    .modal-content
+      .modal-header
+        %h5.modal-title Beskær billede
+        %button.btn-close{type: "button", "data-bs-dismiss" => "modal", "aria-label" => "Close"}
+      .modal-body
+        %div{style: "max-height: 400px"}
+          %img#image-cropper-preview{src: "", alt: "", style: "max-width: 100%"}
+      .modal-footer
+        %button.btn.btn-secondary{type: "button", "data-bs-dismiss" => "modal"} Annuller
+        %button.btn.btn-primary.image-cropper-apply{type: "button"} Anvend

@@ -1,0 +1,22 @@
+en:
+  routes:
+    institutions: institutions
+    students: students
+    events: events
+    providers: providers
+    admin: admin
+    discounts: discounts
+    student_organisation: student-organisation
+    student_organisation_memberships: memberships
+    user_messages: messages
+    invoices: invoices
+    profile: profile
+    preview: preview
+    preview_frame: preview-frame
+    terms: terms
+    double_render: double
+    new: new
+    edit: edit
+    send_reminder: send-reminder
+    archive: archive
+    confirm_archive: confirm-archive

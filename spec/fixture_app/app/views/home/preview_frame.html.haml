@@ -1,0 +1,8 @@
+%h2 Ramme
+= form_with(url: preview_frame_path, method: :get, local: true) do |f|
+  .mb-3
+    = f.label :q, "Søg i rammen", class: "form-label"
+    = f.text_field :q, class: "form-control", value: params[:q]
+  = f.submit "Søg", class: "btn btn-primary"
+- if params[:q].present?
+  %p#frame-result= "Du søgte efter: #{params[:q]}"
