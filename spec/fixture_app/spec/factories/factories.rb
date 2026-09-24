@@ -16,11 +16,11 @@ FactoryBot.define do
     automatic_verified { false }
 
     after(:create) do |student|
-      create(:user, role: student) unless student.user
+      create(:user, role: student) && student.reload unless student.user
     end
 
     trait :with_user do
-      after(:create) { |student| student.user || create(:user, role: student) }
+      after(:create) { |student| student.user || (create(:user, role: student) && student.reload) }
     end
   end
 
@@ -29,7 +29,7 @@ FactoryBot.define do
     registration_number { "12345678" }
 
     after(:create) do |provider|
-      create(:user, role: provider) unless provider.user
+      create(:user, role: provider) && provider.reload unless provider.user
     end
   end
 
@@ -68,7 +68,7 @@ FactoryBot.define do
     sequence(:name) { |n| "Studenterrådet #{n}" }
 
     after(:create) do |org|
-      create(:user, role: org) unless org.user
+      create(:user, role: org) && org.reload unless org.user
     end
   end
 

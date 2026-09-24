@@ -4,6 +4,7 @@
 
   // --- Chosen (app/assets/javascripts/chosen.js, verbatim options) ---------
   window.initialize_chosen = function () {
+    if (!$.fn.chosen) return; // bare layouts (board, booklet, ...) don't ship Chosen
     $(".chosen-select").chosen({
       width: "200px",
       no_results_text: I18n.t("search.no_results_found"),
@@ -13,11 +14,13 @@
     });
   };
   window.initialize_chosen_no_search = function () {
+    if (!$.fn.chosen) return;
     $(".chosen-select-no-search").chosen({ width: "200px", disable_search: true });
   };
 
   // --- flatpickr (flatpicker.js) --------------------------------------------
   window.initialize_flatpickr = function () {
+    if (!$.fn.flatpickr) return;
     $(".js-datetimepicker-field").flatpickr({
       dateFormat: "d/m-Y H:i",
       enableTime: true,

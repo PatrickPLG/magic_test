@@ -12,5 +12,9 @@
         %td= lead.name
         %td= lead.email
         %td= lead.status
-        %td= link_to t("leads.index.edit"), edit_backoffice_lead_path(lead), class: "btn btn-sm btn-outline-primary"
+        %td
+          = link_to t("leads.index.edit"), edit_backoffice_lead_path(lead), class: "btn btn-sm btn-outline-primary"
+          -# Icon-only button (no text, no id), repeated on every row, like Studiz's table actions.
+          %button.btn.btn-sm.btn-outline-warning.js-star{type: "button", onclick: "this.classList.toggle('active')"}
+            %i.bi.bi-star
 = paginate @leads

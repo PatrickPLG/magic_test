@@ -9,6 +9,7 @@ require "rspec/rails"
 require "capybara/rspec"
 require "capybara/cuprite"
 require "database_cleaner/active_record"
+require "magic_test/testing/scripted_human"
 
 # Fresh schema on every boot: the fixture app has no migrations.
 ActiveRecord::Schema.verbose = false
