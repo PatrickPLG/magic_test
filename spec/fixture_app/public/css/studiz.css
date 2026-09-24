@@ -1,0 +1,8 @@
+.checkmark-container { position: relative; padding-left: 28px; cursor: pointer; user-select: none; }
+.checkmark-container .checkmark { position: absolute; left: 0; top: 2px; height: 18px; width: 18px; border: 2px solid #999; border-radius: 3px; background: #fff; }
+.checkmark-container input[type="radio"] + .checkmark { border-radius: 50%; }
+.checkmark-container input:checked + .checkmark { background: #0d6efd; border-color: #0d6efd; }
+.flash-container { top: 60px; z-index: 1050; }
+.generalCont .alert { z-index: 1050; }
+trix-editor { min-height: 120px; }
+.live-support-panel { background: #fff; border: 1px solid #ccc; padding: 8px; }

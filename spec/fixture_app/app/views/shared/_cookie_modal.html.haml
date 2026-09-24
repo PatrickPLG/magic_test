@@ -1,0 +1,10 @@
+#cookie-modal.modal.fade{tabindex: "-1", role: "dialog", "data-auto-open" => "true", "data-bs-backdrop" => "static"}
+  .modal-dialog
+    .modal-content
+      .modal-header
+        %h5.modal-title= t("cookies.title")
+      .modal-body
+        %p Studiz bruger cookies til at huske dine valg.
+      .modal-footer
+        %button.btn.btn-outline-secondary.js-cookie-necessary{type: "button", "data-bs-dismiss" => "modal"}= t("cookies.necessary")
+        %button.btn.btn-primary.js-cookie-accept{type: "button", "data-bs-dismiss" => "modal"}= t("cookies.accept")

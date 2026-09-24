@@ -1,0 +1,16 @@
+- content_for(:nav) do
+  %ul.navbar-nav
+    %li.nav-item= link_to t("nav.students"), institution_students_path(@institution), class: "nav-link active"
+    %li.nav-item= link_to t("nav.events"), institution_events_path(@institution), class: "nav-link"
+%h1= t("students.index.title")
+%p= @institution.name
+%table.table
+  %thead
+    %tr
+      %th Navn
+      %th Handling
+  %tbody
+    - @students.each do |student|
+      %tr{id: "student_#{student.id}"}
+        %td= student.full_name
+        %td= link_to "Vis", "#", class: "btn btn-sm btn-outline-secondary"

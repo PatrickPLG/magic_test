@@ -1,0 +1,12 @@
+%h1= t("memberships.index.title")
+= link_to t("memberships.index.add"), new_student_organisation_student_organisation_membership_path, remote: true, data: {"bs-toggle": "modal", "bs-target": "#ajax-modal"}, class: "btn btn-primary mb-3"
+%table.table#memberships-table
+  %thead
+    %tr
+      %th= t("activerecord.attributes.student_organisation_membership.name")
+      %th= t("activerecord.attributes.student_organisation_membership.email")
+      %th= t("activerecord.attributes.student_organisation_membership.membership_type")
+      %th
+  %tbody
+    - @memberships.each do |membership|
+      = render "membership_row", membership: membership

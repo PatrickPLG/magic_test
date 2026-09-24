@@ -1,0 +1,201 @@
+da:
+  activerecord:
+    attributes:
+      discount:
+        name_da: "Navn"
+        name_en: "Engelsk navn"
+        description: "Beskrivelse"
+        status: "Status"
+        categories: "Kategorier"
+        cover_image: "Coverbillede"
+      events/event:
+        name: "Navn"
+        description: "Beskrivelse"
+        terms_accepted: "Jeg accepterer Studiz' vilkår"
+        account_number: "Kontonummer"
+        registration_number: "Registeringsnummer"
+        starts_at: "Starttidspunkt"
+        category: "Kategori"
+        location: "Sted"
+        published: "Offentliggjort"
+      events/ticket_type:
+        name: "Billettype"
+        price: "Pris"
+      student:
+        first_name: "Fornavn"
+        last_name: "Efternavn"
+        birthday: "Fødselsdag"
+        gender: "Køn"
+        newsletter: "Modtag Studiz' nyhedsbrev"
+        country: "Land"
+        bio: "Om mig"
+      student_organisation_membership:
+        name: "Navn"
+        email: "E-mail"
+        membership_type: "Medlemstype"
+      lead:
+        name: "Navn"
+        email: "E-mail"
+        status: "Status"
+        note: "Note"
+      user_message:
+        body: "Besked"
+    errors:
+      messages:
+        blank: "skal udfyldes"
+    models:
+      discount:
+        one: "Rabat"
+        other: "Rabatter"
+  errors:
+    messages:
+      blank: "skal udfyldes"
+      inclusion: "er ikke i listen"
+  helpers:
+    submit:
+      create: "Opret %{model}"
+      update: "Gem %{model}"
+      submit: "Gem %{model}"
+      events_event:
+        create: "Gem arrangement"
+        update: "Gem arrangement"
+      discount:
+        create: "Opret rabat"
+        update: "Gem"
+      student_organisation_membership:
+        create: "Tilføj"
+      lead:
+        update: "Gem lead"
+      student:
+        update: "Gem profil"
+  nav:
+    events: "Arrangementer"
+    students: "Studerende"
+    discounts: "Rabatter"
+    messages: "Beskeder"
+    profile: "Min profil"
+    login: "Log ind"
+    help: "Hjælp"
+    help_terms: "Vilkår"
+    help_faq: "Ofte stillede spørgsmål"
+  search:
+    no_results_found: "Ingen resultater fundet"
+  events:
+    index:
+      title: "Alle arrangementer"
+      new: "Opret arrangement"
+      empty: "Der er endnu ingen arrangementer"
+    form:
+      general: "Generelt"
+      organiser: "Arrangør"
+      tickets: "Billetter"
+      add_ticket_type: "Tilføj billettype"
+      remove_ticket_type: "Fjern"
+    create:
+      success: "Arrangement oprettet"
+    update:
+      success: "Arrangement gemt"
+    show:
+      signup: "Tilmeld dig"
+      continue_to_payment: "Forsæt til betaling"
+  discounts:
+    index:
+      title: "Dine rabatter"
+      new: "Opret rabat"
+      edit: "Rediger"
+      delete: "Slet"
+      archive: "Arkivér"
+      send_reminder: "Send påmindelse"
+      confirm_delete: "Er du sikker på, at du vil slette rabatten?"
+      see_invoice: "Se faktura"
+      reminder_sent: "Påmindelse sendt"
+    archive:
+      title: "Arkivér rabat"
+      body: "Rabatten forsvinder fra Studiz' app, men kan gendannes."
+      confirm: "Ja, arkivér"
+      cancel: "Annuller"
+    create:
+      success: "Rabat oprettet"
+    update:
+      success: "Rabatten er gemt"
+    destroy:
+      success: "Rabat slettet"
+    confirm_archive:
+      success: "Rabat arkiveret"
+    statuses:
+      draft: "Kladde"
+      active: "Aktiv"
+      inactive: "Inaktiv"
+  memberships:
+    index:
+      title: "Medlemmer"
+      add: "Tilføj medlem"
+      remove: "Fjern"
+    create:
+      success: "Medlem tilføjet"
+    types:
+      member: "Medlem"
+      board: "Bestyrelse"
+  leads:
+    index:
+      title: "Leads"
+      edit: "Rediger"
+    update:
+      success: "Lead opdateret"
+  messages:
+    index:
+      title: "Dine beskeder"
+      send: "Send"
+    create:
+      success: "Besked sendt"
+  profile:
+    edit:
+      title: "Min profil"
+      male: "Mand"
+      female: "Kvinde"
+      other: "Andet"
+    update:
+      success: "Profil gemt"
+  onboarding:
+    title: "Velkommen til Studiz"
+    body: "Vi har lavet en kort guide til dig."
+    later: "Senere"
+    start: "Start guiden"
+  cookies:
+    title: "Vi bruger cookies"
+    accept: "Accepter alle"
+    necessary: "Kun nødvendige"
+  students:
+    index:
+      title: "Studerende"
+  home:
+    index:
+      title: "Forsiden"
+      welcome: "Velkommen, %{name}"
+      cta: "Se rabatter"
+  simple_form:
+    "yes": "Ja"
+    "no": "Nej"
+    required:
+      text: "påkrævet"
+      mark: "*"
+    error_notification:
+      default_message: "Gennemgå venligst fejlene nedenfor:"
+    labels:
+      defaults:
+        email: "E-mail"
+        password: "Adgangskode"
+      discount:
+        name_da: "Navn"
+      student:
+        bio: "Fortæl om dig selv"
+    placeholders:
+      user_message:
+        body: "Skriv en besked..."
+      student:
+        first_name: "Dit fornavn"
+      lead:
+        note: "Intern note"
+    hints:
+      discount:
+        cover_image: "Mindst 1200x600 px"

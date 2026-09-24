@@ -1,0 +1,84 @@
+-# Static playground for the recorder's JS unit tests and the Capybara parity suite.
+%h1#page-title Testside
+%p.intro Velkommen til Studiz' testside. Her er "citater" og 'apostroffer'.
+%nav#main-nav
+  = link_to "Rabatter", root_path, class: "nav-link"
+  = link_to "Rabatter", root_path(all: 1), class: "nav-link"
+  = link_to "Arrangementer", root_path(events: 1), class: "nav-link", title: "Alle arrangementer"
+  = link_to "Se \"Fest\" arrangementer", root_path(filter: "fest"), class: "nav-link"
+  = link_to "Læs Studiz' vilkår ", terms_path, class: "nav-link"
+  %a.nav-link.js-icon-only{href: "#", title: "Indstillinger"}
+    %i.bi.bi-gear
+  = link_to root_path(badge: 1), class: "nav-link" do
+    Beskeder
+    %span.badge.bg-danger 3
+  %a.d-none{href: "/hidden"} Skjult link
+  %button.btn.btn-primary{type: "button"} Gem
+  %button.btn.btn-primary{type: "button"} Gem arrangement
+  %button.btn.btn-secondary{type: "button", disabled: true} Deaktiveret
+  %input.btn{type: "submit", value: "Send", name: "commit"}
+%form#test-form{action: "/", method: "get"}
+  .mb-3
+    %label.form-label{for: "profile_first_name"}
+      %abbr{title: "påkrævet"} *
+      Fornavn
+    %input#profile_first_name.form-control{type: "text", name: "profile[first_name]", placeholder: "Dit fornavn"}
+  .mb-3
+    %label.form-label{for: "profile_last_name"} Efternavn
+    %input#profile_last_name.form-control{type: "text", name: "profile[last_name]"}
+  .mb-3
+    %label.form-label{for: "profile_bio"} Om mig
+    %textarea#profile_bio.form-control{name: "profile[bio]"}
+  .mb-3
+    %label.form-label{for: "profile_country"} Land
+    %select#profile_country.form-select{name: "profile[country]"}
+      %option{value: "DK"} Danmark
+      %option{value: "SE"} Sverige
+  .mb-3
+    %label.form-label{for: "profile_category"} Kategori
+    %select#profile_category.chosen-select{name: "profile[category]"}
+      %option{value: ""} Vælg kategori
+      - Category.order(:name).each do |c|
+        %option{value: c.id}= c.name
+  .form-check
+    %input#profile_newsletter.form-check-input{type: "checkbox", name: "profile[newsletter]"}
+    %label.form-check-label{for: "profile_newsletter"} Nyhedsbrev
+  %label.checkmark-container
+    %input#profile_gender_female.visually-hidden{type: "radio", name: "profile[gender]", value: "female"}
+    %span.checkmark
+    Kvinde
+  %label.checkmark-container
+    %input#profile_terms.visually-hidden{type: "checkbox", name: "profile[terms]"}
+    %span.checkmark
+    Jeg accepterer Studiz' vilkår
+  %input#profile_avatar.visually-hidden{type: "file", name: "profile[avatar]"}
+  %fieldset{disabled: true}
+    %input#profile_locked{type: "text", name: "profile[locked]"}
+  %button.btn.btn-primary{type: "submit"} Send
+%table#leads-table.table
+  %tbody
+    - [["Lead 1", "a@x.dk"], ["Lead 2", "b@x.dk"], ["Lead 3", "c@x.dk"]].each_with_index do |(name, email), i|
+      %tr{id: "lead_#{i + 1}"}
+        %td= name
+        %td= email
+        %td
+          = link_to "Rediger", root_path(lead: i + 1), class: "btn btn-sm"
+          %button.btn.btn-sm.js-star{type: "button"}
+            %i.bi.bi-star
+.row#cards
+  .card.discount-card{id: "discount-card-#{params[:discount_id]}", "data-discount-id" => params[:discount_id]}
+    .card-body
+      %h5.card-title= Discount.find_by(id: params[:discount_id])&.name_da || "Kaffe 20%"
+      %span.badge.bg-success Aktiv
+  .card.discount-card#discount-card-new
+    .card-body
+      %h5.card-title Te 10%
+%input#events_event_ticket_types_attributes_1695551234567_name{type: "text", name: "events_event[ticket_types_attributes][1695551234567][name]"}
+%input#trix_input_3{type: "hidden", name: "events_event[description]"}
+%trix-editor#events_event_description{input: "trix_input_3"}
+#ajax-modal.modal.fade{tabindex: "-1"}
+  .modal-dialog
+    .modal-content
+      .modal-body
+        %button.btn{type: "button"} Gem
+        %button.btn{type: "button"} Annuller

@@ -1,0 +1,21 @@
+- content_for(:nav) do
+  %ul.navbar-nav
+    %li.nav-item= link_to t("nav.discounts"), provider_admin_discounts_path(@provider), class: "nav-link active"
+%h1= t("discounts.index.title")
+.mb-3
+  = link_to t("discounts.index.new"), new_provider_admin_discount_path(@provider), class: "btn btn-primary"
+  - if @invoice
+    = link_to t("discounts.index.see_invoice"), invoice_path(@invoice), target: "_blank", class: "btn btn-outline-secondary"
+.row#discount-list
+  - @discounts.each do |discount|
+    .col-md-6
+      .card.mb-3{id: "discount-card-#{discount.id}", class: "discount-card"}
+        .card-body
+          %h5.card-title= discount.name_da
+          %span.badge.bg-secondary.status-badge= t("discounts.statuses.#{discount.status}")
+          %span.badge.bg-light.text-dark.js-reminder-count= discount.reminders_sent
+          .mt-2.btn-group
+            = link_to t("discounts.index.edit"), edit_provider_admin_discount_path(@provider, discount), class: "btn btn-sm btn-outline-primary"
+            = link_to t("discounts.index.delete"), provider_admin_discount_path(@provider, discount), method: :delete, data: {confirm: t("discounts.index.confirm_delete")}, class: "btn btn-sm btn-outline-danger"
+            = link_to t("discounts.index.archive"), archive_provider_admin_discount_path(@provider, discount), remote: true, data: {"bs-toggle": "modal", "bs-target": "#ajax-modal"}, class: "btn btn-sm btn-outline-secondary"
+            = button_to t("discounts.index.send_reminder"), send_reminder_provider_admin_discount_path(@provider, discount), remote: true, class: "btn btn-sm btn-outline-info", form_class: "d-inline"

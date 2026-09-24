@@ -1,0 +1,7 @@
+.invoice{id: "invoice_#{@invoice.id}"}
+  %h1= "Faktura #{@invoice.number}"
+  %p= "Beløb: #{@invoice.amount_cents / 100} kr."
+  %button.btn.btn-primary.js-print{type: "button", onclick: "document.body.classList.add('printed')"} Udskriv
+  .form-check.mt-3
+    %input.form-check-input{type: "checkbox", id: "invoice_#{@invoice.id}_paid", name: "paid"}
+    %label.form-check-label{for: "invoice_#{@invoice.id}_paid"} Betalt

@@ -1,0 +1,33 @@
+!!!
+%html{lang: I18n.locale}
+  %head
+    = render "layouts/head"
+  %body.student-layout
+    %nav.navbar.navbar-expand-lg.navbar-light.bg-light
+      .container-fluid
+        = link_to "Studiz", root_path, class: "navbar-brand"
+        %ul.navbar-nav.me-auto
+          %li.nav-item= link_to t("nav.discounts"), root_path, class: "nav-link"
+          %li.nav-item= link_to t("nav.messages"), user_messages_path, class: "nav-link"
+          %li.nav-item= link_to t("nav.profile"), edit_profile_path, class: "nav-link"
+          %li.nav-item= link_to "English", root_path(locale: :en), class: "nav-link"
+          -# Studiz-style hover menu: opens on mouseenter (jQuery), not on click.
+          %li.nav-item.dropdown.hover-menu#helpMenu
+            %a.nav-link.dropdown-toggle{href: "#", role: "button", "aria-expanded" => "false"}= t("nav.help")
+            %ul.dropdown-menu{"aria-labelledby" => "helpMenu"}
+              %li= link_to t("nav.help_terms"), terms_path, class: "dropdown-item"
+              %li= link_to t("nav.help_faq"), root_path, class: "dropdown-item"
+        - if current_user
+          %span.navbar-text.me-3= current_user.email
+        - else
+          = render "shared/login_dropdown"
+    .generalCont
+      = flash_messages
+    %main.container.mt-4
+      = yield
+    = render "shared/ajax_modal"
+    = render "shared/full_view_modal"
+    = render "shared/toast"
+    - if current_student && !current_user.onboarded
+      = render "shared/onboarding_modal"
+    = render "shared/live_support"

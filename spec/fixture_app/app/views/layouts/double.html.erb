@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="<%= I18n.locale %>">
+  <head>
+    <meta charset="utf-8">
+    <title>Studiz mail</title>
+    <%# Studiz mail layouts render the partial twice in one document. %>
+    <%= render "magic_test/support" if Rails.env.test? %>
+  </head>
+  <body class="double-layout">
+    <%= render "magic_test/support" if Rails.env.test? %>
+    <main class="container mt-4"><%= yield %></main>
+  </body>
+</html>

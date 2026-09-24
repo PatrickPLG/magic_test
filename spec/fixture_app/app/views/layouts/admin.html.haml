@@ -1,0 +1,21 @@
+!!!
+%html{lang: I18n.locale}
+  %head
+    = render "layouts/head"
+  %body.admin-layout
+    %nav.navbar.navbar-expand-lg.navbar-dark.bg-dark
+      .container-fluid
+        = link_to "Studiz Admin", root_path, class: "navbar-brand"
+        = yield :nav
+        - if current_user
+          %span.navbar-text.ms-auto.me-3= current_user.email
+    .flash-container.position-fixed.w-100
+      = flash_messages
+    .container-fluid.mt-4
+      = yield
+    = render "shared/ajax_modal"
+    = render "shared/full_view_modal"
+    = render "shared/toast"
+    - unless cookie_settings_accepted?
+      = render "shared/cookie_modal"
+    = render "shared/live_support"

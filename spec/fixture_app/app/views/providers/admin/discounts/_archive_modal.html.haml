@@ -1,0 +1,10 @@
+.modal-header
+  %h5.modal-title= t("discounts.archive.title")
+  %button.btn-close{type: "button", "data-bs-dismiss" => "modal", "aria-label" => "Close"}
+.modal-body
+  %p= t("discounts.archive.body")
+  %p
+    %strong= @discount.name_da
+.modal-footer
+  %button.btn.btn-secondary{type: "button", "data-bs-dismiss" => "modal"}= t("discounts.archive.cancel")
+  = button_to t("discounts.archive.confirm"), confirm_archive_provider_admin_discount_path(@provider, @discount), class: "btn btn-danger", form_class: "d-inline"

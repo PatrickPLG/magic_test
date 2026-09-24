@@ -1,0 +1,32 @@
+= simple_form_for([@institution, @event], url: (@event.persisted? ? institution_event_path(@institution, @event) : institution_events_path(@institution)), html: {id: "event-form"}) do |f|
+  = f.error_notification
+  %ul.nav.nav-tabs.mb-3{role: "tablist"}
+    %li.nav-item{role: "presentation"}
+      %button#tab-general.nav-link.active{type: "button", "data-bs-toggle" => "tab", "data-bs-target" => "#pane-general", role: "tab"}= t("events.form.general")
+    %li.nav-item{role: "presentation"}
+      %button#tab-organiser.nav-link{type: "button", "data-bs-toggle" => "tab", "data-bs-target" => "#pane-organiser", role: "tab"}= t("events.form.organiser")
+    %li.nav-item{role: "presentation"}
+      %button#tab-tickets.nav-link{type: "button", "data-bs-toggle" => "tab", "data-bs-target" => "#pane-tickets", role: "tab"}= t("events.form.tickets")
+  .tab-content
+    #pane-general.tab-pane.fade.show.active{role: "tabpanel"}
+      = f.input :name, required: true
+      .mb-3
+        = f.label :description, class: "form-label"
+        = rich_text_area_tag("events_event[description]", @event.description, id: "events_event_description")
+      = f.input :category_id, collection: Category.order(:name), label: t("activerecord.attributes.events/event.category"), input_html: {class: "chosen-select"}, include_blank: "Vælg kategori"
+      = f.input :location
+      .mb-3.js-datetimepicker-field{"data-wrap" => "true"}
+        = f.label :starts_at, class: "form-label"
+        %input.form-control{type: "text", name: "events_event[starts_at]", id: "events_event_starts_at", "data-input" => true, value: @event.starts_at&.strftime("%d/%m-%Y %H:%M"), placeholder: "dd/mm-åååå tt:mm"}
+        %a.input-button.btn.btn-outline-secondary.btn-sm.mt-1{"data-toggle" => true, title: "Vælg dato", href: "javascript:void(0)"} Vælg dato
+      = f.input :terms_accepted, as: :boolean
+      = f.input :published, as: :boolean
+    #pane-organiser.tab-pane.fade{role: "tabpanel"}
+      = f.input :account_number
+      = f.input :registration_number
+    #pane-tickets.tab-pane.fade{role: "tabpanel"}
+      #ticket-types
+        = f.simple_fields_for :ticket_types do |tf|
+          = render "ticket_type_fields", f: tf
+      = link_to t("events.form.add_ticket_type"), "#", class: "btn btn-outline-secondary btn-sm js-add-ticket-type", "data-association-insertion-template" => (f.simple_fields_for(:ticket_types, Events::TicketType.new, child_index: "NEW_RECORD") { |tf| render("ticket_type_fields", f: tf) })
+  = f.button :submit, t("helpers.submit.events_event.#{@event.persisted? ? "update" : "create"}"), class: "btn btn-primary"

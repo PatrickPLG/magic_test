@@ -1,0 +1,11 @@
+{
+  "name": "magic_test-recorder",
+  "private": true,
+  "description": "Lint tooling for the magic_test recorder JavaScript (no runtime build step).",
+  "scripts": {
+    "lint": "eslint app/assets/javascripts/magic_test/src spec/js"
+  },
+  "devDependencies": {
+    "eslint": "^9.12.0"
+  }
+}

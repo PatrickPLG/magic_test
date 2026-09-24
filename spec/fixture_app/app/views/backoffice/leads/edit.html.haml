@@ -1,0 +1,7 @@
+%h1= "Rediger lead: #{@lead.name}"
+= simple_form_for(@lead, url: backoffice_lead_path(@lead)) do |f|
+  = f.input :name
+  = f.input :email
+  = f.input :status, collection: Lead::STATUSES, include_blank: false
+  = f.input :note, as: :text
+  = f.button :submit, t("helpers.submit.lead.update"), class: "btn btn-primary"

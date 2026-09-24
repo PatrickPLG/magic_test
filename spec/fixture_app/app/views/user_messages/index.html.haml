@@ -1,0 +1,7 @@
+%h1= t("messages.index.title")
+%ul#message-list
+  - @messages.each do |m|
+    %li= m.body
+= simple_form_for(@message, url: user_messages_path, html: {id: "message-form"}) do |f|
+  = f.input :body, as: :string
+  = f.button :submit, t("messages.index.send"), class: "btn btn-primary"
