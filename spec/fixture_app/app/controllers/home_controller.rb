@@ -20,4 +20,8 @@ class HomeController < ApplicationController
   def double_render
     render layout: "double"
   end
+
+  def js_test_page
+    render layout: "admin"
+  end
 end

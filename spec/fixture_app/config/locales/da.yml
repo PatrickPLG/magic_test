@@ -75,6 +75,9 @@ da:
     messages: "Beskeder"
     profile: "Min profil"
     login: "Log ind"
+    help: "Hjælp"
+    help_terms: "Vilkår"
+    help_faq: "Ofte stillede spørgsmål"
   search:
     no_results_found: "Ingen resultater fundet"
   events:

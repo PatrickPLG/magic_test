@@ -168,6 +168,15 @@
     initCoverImageUpload();
     initNestedFields();
     initLiveSupport();
+    // Studiz: header menus that open on hover (jQuery mouseenter/mouseleave).
+    $(document).on("mouseenter", ".hover-menu", function () {
+      $(this).addClass("show").find(".dropdown-menu").addClass("show");
+      $(this).find("[role=button]").attr("aria-expanded", "true");
+    });
+    $(document).on("mouseleave", ".hover-menu", function () {
+      $(this).removeClass("show").find(".dropdown-menu").removeClass("show");
+      $(this).find("[role=button]").attr("aria-expanded", "false");
+    });
     // Studiz: re-run chosen after AJAX renders.
     $(document).on("ajax:complete", function () { window.initialize_chosen(); });
   });

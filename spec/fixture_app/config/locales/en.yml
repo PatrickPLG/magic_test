@@ -25,6 +25,9 @@ en:
     messages: "Messages"
     profile: "My profile"
     login: "Log in"
+    help: "Help"
+    help_terms: "Terms"
+    help_faq: "FAQ"
   search:
     no_results_found: "No results found"
   events:

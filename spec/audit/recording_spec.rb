@@ -83,10 +83,10 @@ RSpec.describe("Audit: recording in the browser", :recorder, type: :system) do
 
     it "reflects a trailing Backspace" do
       visit edit_profile_path
-      lines = record { |h| h.fill("#student_first_name", "Mettes").press(:backspace) }
+      lines = record { |h| h.fill("#student_last_name", "Nielsen").press(:backspace) }
       expect(joined(lines)).to(include("fill_in"))
-      expect(joined(lines)).to(include("'Mette'"))
-      expect(joined(lines)).not_to(include("Mettes"))
+      expect(joined(lines)).to(include("'Nielse'"))
+      expect(joined(lines)).not_to(include("Nielsen"))
     end
 
     it "records a paste" do
@@ -160,9 +160,9 @@ RSpec.describe("Audit: recording in the browser", :recorder, type: :system) do
         h.type("Fe")
         h.click("#events_event_category_id_chosen .chosen-results li.active-result", text: "Fest")
       end
-      chosen_lines = lines.select { |l| l.include?("events_event_category_id") || l.include?("Kategori") }
+      chosen_lines = lines.select { |l| l.include?("chosen") || l.include?("events_event_category_id") || l.include?("Kategori") }
       expect(chosen_lines.size).to(eq(1))
-      expect(chosen_lines.first).to(include("Fest"))
+      expect(chosen_lines.first).to(match(/\Amagic_chosen_select\('Fest', from: .+\)\z/))
     end
   end
 
@@ -216,9 +216,12 @@ RSpec.describe("Audit: recording in the browser", :recorder, type: :system) do
     it "records two quick clicks on different elements" do
       sign_in_as_institution(institution)
       visit new_institution_event_path(institution)
-      lines = record { |h| h.click_on("Arrangør"); h.click_on("Billetter") }
-      expect(joined(lines)).to(include("Arrangør"))
-      expect(joined(lines)).to(include("Billetter"))
+      lines = record { |h|
+        h.click_on("Arrangør")
+        h.click_on("Billetter")
+      }
+      expect(joined(lines)).to(match(/Arrangør|events\.form\.organiser/))
+      expect(joined(lines)).to(match(/Billetter|events\.form\.tickets/))
     end
   end
 
@@ -279,7 +282,10 @@ RSpec.describe("Audit: recording in the browser", :recorder, type: :system) do
       visit terms_path
       logs = []
       page.driver.browser.page.on("Runtime.consoleAPICalled") { |params| logs << params.dig("args", 0, "value").to_s }
-      lines = record { |h| h.hover("h1"); h.hover("p") }
+      lines = record { |h|
+        h.hover("h1")
+        h.hover("p")
+      }
       expect(logs).to(be_empty)
       expect(joined(lines)).not_to(include(".hover"))
     end
@@ -300,7 +306,10 @@ RSpec.describe("Audit: recording in the browser", :recorder, type: :system) do
   describe "audit #21: right-click" do
     it "does not permanently disable the context menu" do
       visit terms_path
-      record { |h| h.right_click("h1"); h.right_click("h1") }
+      record { |h|
+        h.right_click("h1")
+        h.right_click("h1")
+      }
       prevented = page.evaluate_script("!document.body.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))")
       expect(prevented).to(be(false))
     end

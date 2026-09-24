@@ -32,7 +32,10 @@ module MagicTest
       end
 
       def click_on(text, **options)
-        ferrum_node(page.find(:link_or_button, text, **options)).click
+        element = page.find(:link_or_button, text, **options)
+        ensure_recording
+        settle_element(element)
+        ferrum_node(element).click
         self
       end
 
@@ -129,14 +132,57 @@ module MagicTest
       end
 
       def ferrum_node(capybara_element)
+        ensure_recording
         capybara_element.native.node
+      end
+
+      # When a recorder is present in the page, wait until it is connected to
+      # the session so a fast action right after navigation is not lost.
+      def ensure_recording(timeout: 3)
+        deadline = Time.now + timeout
+        loop do
+          status = page.evaluate_script("window.MagicTest && window.MagicTest.status ? window.MagicTest.status() : null")
+          return if status.nil? || status == "recording" || status == "finished" || status == "paused"
+          return if Time.now > deadline
+          sleep 0.05
+        end
+      rescue
+        nil
       end
 
       private
 
       def node_for(locator, **options)
         element = locator.is_a?(Capybara::Node::Element) ? locator : page.find(:css, locator, **options)
+        ensure_recording
+        settle_element(element)
         ferrum_node(element)
+      end
+
+      # A person sees the element before acting on it: scroll it to the
+      # middle of the viewport (Ferrum only scrolls to the edge) and let a
+      # Bootstrap fade finish (opacity transitions on modals and dropdowns).
+      def settle_element(element)
+        page.execute_script("arguments[0].scrollIntoView({block: 'center', inline: 'center'})", element)
+        deadline = Time.now + 1.5
+        loop do
+          settled = page.evaluate_script(<<~JS, element)
+            (function (el) {
+              var node = el;
+              while (node && node.nodeType === 1) {
+                var s = window.getComputedStyle(node);
+                if (s.display === 'none' || s.visibility === 'hidden') return true;
+                if (parseFloat(s.opacity) < 1) return false;
+                node = node.parentElement;
+              }
+              return true;
+            })(arguments[0])
+          JS
+          return if settled || Time.now > deadline
+          sleep 0.05
+        end
+      rescue
+        nil
       end
     end
   end

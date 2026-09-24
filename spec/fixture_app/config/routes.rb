@@ -41,8 +41,10 @@ Rails.application.routes.draw do
     resources :leads, only: [:index, :edit, :update]
   end
 
+  get "js-test-page", to: "home#js_test_page"
+
   namespace :live_support do
-    get :ping
-    post :ping, action: :ping_post
+    get :ping, to: "pings#ping"
+    post :ping, to: "pings#ping_post"
   end
 end

@@ -44,5 +44,5 @@ end
 
 RouteTranslator.config do |config|
   config.available_locales = [:da, :en]
-  config.hide_locale = true # `da` is unprefixed, `/en/...` is prefixed (as in Studiz)
+  # Default `hide_locale = false`: the default locale (da) is unprefixed, `/en/...` is prefixed, as in Studiz.
 end

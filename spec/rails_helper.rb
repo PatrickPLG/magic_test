@@ -28,6 +28,11 @@ Capybara.register_driver(:cuprite) do |app|
 end
 
 RSpec.configure do |config|
+  # Recorder-level specs (record -> generate in the browser) need the engine
+  # booted with MAGIC_TEST set; they run in a second process:
+  #   MAGIC_TEST=1 MAGIC_TEST_HEADLESS=1 bin/rspec --tag recorder
+  config.filter_run_excluding(recorder: true) unless MagicTest.enabled?
+  config.filter_run_excluding(no_recorder: true) if MagicTest.enabled?
   config.use_transactional_fixtures = false
   config.infer_spec_type_from_file_location!
   config.filter_rails_from_backtrace!
