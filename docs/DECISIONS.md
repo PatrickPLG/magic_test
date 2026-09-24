@@ -10,7 +10,7 @@ Every non-obvious choice, with the reason. Newest at the bottom of each section.
 
 ## Toolchain
 
-- **Ruby 3.3.6 locally, 3.2.2 in CI.** The container ships 3.3.6 and no 3.2.2; CI (`.github/workflows/ci.yml`) pins 3.2.2 with `ruby/setup-ruby`. Rails 7.0.8 on Ruby 3.3 needs `concurrent-ruby 1.3.4` (the `Logger` constant regression), pinned in the Gemfile.
+- **Ruby 3.3.6 locally, 3.2.2 in CI.** The container ships 3.3.6 (and a 3.2.6 used to verify the suites under Ruby 3.2) but no 3.2.2; CI (`.github/workflows/ci.yml`) pins 3.2.2 with `ruby/setup-ruby`. Rails 7.0.8 on Ruby 3.3 needs `concurrent-ruby 1.3.4` (the `Logger` constant regression), pinned in the Gemfile. `parallel` (a rubocop/standard dependency) is pinned to 1.x because 2.x needs Ruby 3.3 and the lockfile is resolved on 3.3.6; the first CI run failed exactly there.
 - **Chrome wrapper for the gem's own suite** (`spec/support/bin/chrome`) adds `--no-sandbox` only when running as root (containers); Ferrum deliberately does not add it.
 - **`bin/rspec` / `bin/standardrb` binstubs** because Bundler 4 in the container cannot resolve `bundle exec rspec`.
 - **No Node build step.** The recorder is written as plain ES2017 modules under `app/assets/javascripts/magic_test/src/` and concatenated into one IIFE at request time by `MagicTest::RecorderBundle` (cached per process). `rake bundle` writes `dist/recorder.js` for inspection; eslint runs on the sources in CI.
