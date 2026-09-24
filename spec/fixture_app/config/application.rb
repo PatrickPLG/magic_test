@@ -1,4 +1,5 @@
 require_relative "boot"
+require "fileutils"
 
 require "rails"
 require "active_record/railtie"
@@ -37,6 +38,8 @@ module FixtureApp
     config.active_support.deprecation = :stderr
     config.active_record.dump_schema_after_migration = false
     config.log_level = :warn
+    # log/ and tmp/ are gitignored; a fresh checkout (CI, worktrees) has neither.
+    %w[log tmp].each { |dir| FileUtils.mkdir_p(File.expand_path("../#{dir}", __dir__)) }
     config.logger = ActiveSupport::Logger.new(File.expand_path("../log/test.log", __dir__))
     config.filter_parameters += [:password]
   end

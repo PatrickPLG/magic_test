@@ -27,3 +27,6 @@ gem "concurrent-ruby", "1.3.4"
 gem "standard", ">= 1.40"
 gem "rake", ">= 13.0"
 gem "pry" # optional at runtime; present here to test the `open_console` command
+
+# parallel >= 2.0 (pulled in by rubocop/standard) needs Ruby >= 3.3; CI runs 3.2.2.
+gem "parallel", "~> 1.20"
