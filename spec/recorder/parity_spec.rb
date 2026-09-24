@@ -12,16 +12,18 @@ RSpec.describe("Capybara matching parity", :recorder, type: :system) do
   let!(:discounts) { [create(:discount, provider: provider, name_da: "Kaffe 20%"), create(:discount, provider: provider, name_da: "Te 10%")] }
   let!(:leads) { 3.times.map { |i| create(:lead, name: "Lead #{i + 1}") } }
 
-  LOCATORS = {
-    link_or_button: ["Rabatter", "Gem", "Gem arrangement", "Rediger", "Slet", "Arrangementer", "Send", "Deaktiveret", "Skjult link", "Læs Studiz' vilkår", "Se \"Fest\" arrangementer", "Beskeder", "arrangement", "Indstillinger", "Opret arrangement", "Arrangør", "Tilføj billettype", "Send påmindelse", "Se faktura", "x"],
-    link: ["Rabatter", "Rediger", "Skjult link", "Beskeder", "Arrangementer", "Se faktura"],
-    button: ["Gem", "Send", "Deaktiveret", "Gem arrangement", "Send påmindelse", "Arrangør"],
-    fillable_field: ["Fornavn", "* Fornavn", "profile_first_name", "profile[first_name]", "Dit fornavn", "Efternavn", "Om mig", "profile[locked]", "Navn", "* Navn", "Kontonummer", "events_event_name", "Starttidspunkt", "Billettype"],
-    select: ["Land", "Kategori", "profile_country", "Status", "Kategorier"],
-    checkbox: ["Nyhedsbrev", "Jeg accepterer Studiz' vilkår", "profile[terms]", "Offentliggjort"],
-    radio_button: ["Kvinde", "profile_gender_female", "Mand"],
-    file_field: ["profile[avatar]", "discount[cover_image]", "Coverbillede"]
-  }.freeze
+  let(:locators) do
+    {
+      link_or_button: ["Rabatter", "Gem", "Gem arrangement", "Rediger", "Slet", "Arrangementer", "Send", "Deaktiveret", "Skjult link", "Læs Studiz' vilkår", "Se \"Fest\" arrangementer", "Beskeder", "arrangement", "Indstillinger", "Opret arrangement", "Arrangør", "Tilføj billettype", "Send påmindelse", "Se faktura", "x"],
+      link: ["Rabatter", "Rediger", "Skjult link", "Beskeder", "Arrangementer", "Se faktura"],
+      button: ["Gem", "Send", "Deaktiveret", "Gem arrangement", "Send påmindelse", "Arrangør"],
+      fillable_field: ["Fornavn", "* Fornavn", "profile_first_name", "profile[first_name]", "Dit fornavn", "Efternavn", "Om mig", "profile[locked]", "Navn", "* Navn", "Kontonummer", "events_event_name", "Starttidspunkt", "Billettype"],
+      select: ["Land", "Kategori", "profile_country", "Status", "Kategorier"],
+      checkbox: ["Nyhedsbrev", "Jeg accepterer Studiz' vilkår", "profile[terms]", "Offentliggjort"],
+      radio_button: ["Kvinde", "profile_gender_female", "Mand"],
+      file_field: ["profile[avatar]", "discount[cover_image]", "Coverbillede"]
+    }
+  end
 
   def js_count(kind, locator, visible_all: false)
     page.evaluate_script(<<~JS, kind.to_s, locator, visible_all)
@@ -40,13 +42,13 @@ RSpec.describe("Capybara matching parity", :recorder, type: :system) do
 
   def check_page
     mismatches = []
-    LOCATORS.each do |kind, locators|
-      locators.each do |locator|
+    locators.each do |kind, locs|
+      locs.each do |locator|
         [false, true].each do |visible_all|
           next if visible_all && !%i[checkbox radio_button select file_field fillable_field].include?(kind)
           js = js_count(kind, locator, visible_all: visible_all)
           rb = ruby_count(kind, locator, visible_all: visible_all)
-          mismatches << "#{kind} #{locator.inspect}#{visible_all ? " (visible: :all)" : ""}: js=#{js.inspect} ruby=#{rb.inspect}" unless js == rb
+          mismatches << "#{kind} #{locator.inspect}#{" (visible: :all)" if visible_all}: js=#{js.inspect} ruby=#{rb.inspect}" unless js == rb
         end
       end
     end
@@ -98,7 +100,13 @@ RSpec.describe("Capybara matching parity", :recorder, type: :system) do
     check_page
     within("#ajax-modal") do
       %w[Navn E-mail Medlemstype Tilføj Annuller].each do |loc|
-        kind = %w[Tilføj Annuller].include?(loc) ? :link_or_button : (loc == "Medlemstype" ? :select : :fillable_field)
+        kind = if %w[Tilføj Annuller].include?(loc)
+          :link_or_button
+        elsif loc == "Medlemstype"
+          :select
+        else
+          :fillable_field
+        end
         js = page.evaluate_script("(function(){var MT=window.MagicTest.__internals;var c=MT.capybara.count(#{kind.to_s.inspect}, #{loc.inspect}, document.querySelector('#ajax-modal'));return [c.exact,c.partial];})()")
         expect(js).to(eq([page.all(kind, loc, exact: true, wait: 0).size, page.all(kind, loc, exact: false, wait: 0).size]), "#{kind} #{loc} in modal")
       end

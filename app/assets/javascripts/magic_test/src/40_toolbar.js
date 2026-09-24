@@ -62,6 +62,10 @@ MT.toolbar = (function () {
     var panel = h('div', { class: 'mt' });
     els.panel = panel;
     els.status = h('span', { class: 'status', text: 'REC' });
+    // Re-render on every state poll and status change, so the step list is
+    // live without the person touching the panel.
+    MT.transport.onState(function () { render(); });
+    MT.session.onStatus(function () { render(); });
     els.collapse = h('button', { text: '–', title: 'Collapse', onclick: function () { collapsed = !collapsed; panel.classList.toggle('collapsed', collapsed); els.collapse.textContent = collapsed ? '+' : '–'; } });
     var head = h('div', { class: 'head' }, [h('span', { class: 'title', text: 'magic_test' }), els.status, els.collapse]);
     makeDraggable(head, panel);
