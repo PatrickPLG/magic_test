@@ -160,6 +160,13 @@ expect(discount.reload.name_da).to(eq('Kaffe 25%'))                  # column ch
 expect(page).to(have_content('Rabatten er gemt'))                    # toast
 ```
 
+DB-change suggestions skip bookkeeping tables: `schema_migrations`,
+`ar_internal_metadata`, `sessions`, Active Storage, `audits`, `ahoy_visits`,
+`ahoy_events`, `flipper_features`, `flipper_gates` and every `live_support_*`
+table. `MagicTest.config.ignored_tables` adds to that list (strings match a
+table name, regexps are matched against it); assigning to it keeps the
+defaults.
+
 ### Setup for the next run
 
 The recorder starts after the example's `let!`/`before` blocks have already
@@ -199,6 +206,7 @@ MagicTest.config.assertion_style = :house        # expect(Model.count).to(eq(n))
 MagicTest.config.locale = nil                    # nil: the locale of the page being recorded
 MagicTest.config.fixture_files_dir = "spec/fixtures/files"
 MagicTest.config.ignored_request_paths << %r{\A/api/ping}   # background traffic never counts as an effect
+MagicTest.config.ignored_tables << "report_rows"              # no DB-change suggestions for this table (String or Regexp)
 MagicTest.config.window_size = [1200, 800]
 MagicTest.config.command_timeout = 20            # seconds a toolbar command may take
 MagicTest.config.studiz_modals = %w[#ajax-modal #full-view-modal #image-cropper-modal]

@@ -3,7 +3,6 @@ module MagicTest
   # `sql.active_record` and maps tables to models (including namespaced ones
   # such as Events::Event) to suggest count/attribute expectations.
   class DbChanges
-    IGNORED_TABLES = %w[schema_migrations ar_internal_metadata sessions active_storage_blobs active_storage_attachments].freeze
     STATEMENT = /\A\s*(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+[`"]?([A-Za-z0-9_]+)[`"]?/i
 
     Change = Struct.new(:operation, :table, :model, :count)
@@ -20,8 +19,14 @@ module MagicTest
         [op, m[2]]
       end
 
+      # Configurable in MagicTest.config.ignored_tables (merged with
+      # Configuration::DEFAULT_IGNORED_TABLES).
+      def ignored_table?(table)
+        MagicTest.config.ignored_table?(table)
+      end
+
       def model_for(table)
-        return nil if IGNORED_TABLES.include?(table)
+        return nil if ignored_table?(table)
         @models ||= {}
         @models[table] ||= begin
           eager_load!

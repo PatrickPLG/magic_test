@@ -56,6 +56,10 @@ A rewrite of the recorder for the Studiz Rails app. Branch
   toast, modal closed, sign-in and factory setup for the next run.
 - Dynamic ids and classes (timestamps, `trix_input_N`, Bootstrap utility and
   state classes, nested-field indexes) are never used.
+- `MagicTest.config.ignored_tables` (strings or regexps, always merged with
+  the defaults) keeps bookkeeping tables out of DB-change suggestions; the
+  defaults now also cover `audits`, `ahoy_visits`, `ahoy_events`,
+  `flipper_features`, `flipper_gates` and `live_support_*`.
 
 ### Testing
 
