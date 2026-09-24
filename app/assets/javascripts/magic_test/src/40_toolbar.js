@@ -258,6 +258,19 @@ MT.toolbar = (function () {
     if (!keep) dialog = null;
   }
 
+  // Moves the panel to the other side of the viewport when it covers the
+  // given point (what a person does by dragging it out of the way). Returns
+  // true when the point was covered.
+  function dodge(x, y) {
+    if (!host || !els.panel) return false;
+    var el = document.elementFromPoint(x, y);
+    if (!el || (el !== host && !host.contains(el))) return false;
+    var onRight = x > window.innerWidth / 2;
+    els.panel.style.left = onRight ? '12px' : 'auto';
+    els.panel.style.right = onRight ? 'auto' : '12px';
+    return true;
+  }
+
   // Alt+Shift+<key> avoids Chrome's and Studiz's shortcuts.
   function shortcut(e) {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return false;
@@ -275,5 +288,5 @@ MT.toolbar = (function () {
     return handled;
   }
 
-  return { mount: mount, render: render, notify: notify, showDialog: showDialog, hideDialog: hideDialog, shortcut: shortcut, host: function () { return host; } };
+  return { mount: mount, render: render, notify: notify, dodge: dodge, showDialog: showDialog, hideDialog: hideDialog, shortcut: shortcut, host: function () { return host; } };
 })();

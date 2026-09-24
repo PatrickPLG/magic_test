@@ -27,7 +27,7 @@ module MagicTest
       end
 
       def click(locator, **options)
-        node_for(locator, **options).click
+        dodge_toolbar(node_for(locator, **options)).click
         self
       end
 
@@ -35,12 +35,12 @@ module MagicTest
         element = page.find(:link_or_button, text, **options)
         ensure_recording
         settle_element(element)
-        ferrum_node(element).click
+        dodge_toolbar(ferrum_node(element)).click
         self
       end
 
       def right_click(locator, **options)
-        node_for(locator, **options).click(mode: :right)
+        dodge_toolbar(node_for(locator, **options)).click(mode: :right)
         self
       end
 
@@ -151,6 +151,16 @@ module MagicTest
       end
 
       private
+
+      # The toolbar is a fixed panel; when it covers the point about to be
+      # clicked, move it aside first, as a person would drag it away.
+      def dodge_toolbar(node)
+        x, y = node.find_position
+        page.execute_script("window.MagicTest && window.MagicTest.__internals.toolbar && window.MagicTest.__internals.toolbar.dodge(arguments[0], arguments[1])", x, y)
+        node
+      rescue
+        node
+      end
 
       def node_for(locator, **options)
         element = locator.is_a?(Capybara::Node::Element) ? locator : page.find(:css, locator, **options)

@@ -2,17 +2,26 @@ require "date"
 
 module MagicTest
   # Renders Ruby literals for generated code. Single quotes when nothing needs
-  # escaping (Studiz style), otherwise String#inspect (which handles quotes,
-  # backslashes, control characters, newlines and `#{`).
+  # escaping (Studiz style), otherwise a double-quoted literal with only the
+  # characters Ruby requires escaped. `String#inspect` is not used: it escapes
+  # every non-ASCII character (`\u00E5`) when the process locale is not UTF-8,
+  # and generated specs must read the same on every machine.
   module RubyLiteral
     SINGLE_QUOTE_SAFE = /\A[^'\\\p{Cntrl}]*\z/
+    CONTROL_ESCAPES = {"\n" => "\\n", "\t" => "\\t", "\r" => "\\r", "\e" => "\\e", "\a" => "\\a", "\b" => "\\b", "\f" => "\\f", "\v" => "\\v"}.freeze
 
     module_function
 
     def string(value)
       value = value.to_s
       return "'#{value}'" if value.match?(SINGLE_QUOTE_SAFE)
-      value.inspect
+      escaped = value.gsub(/["\\]|#(?=[{$@])|\p{Cntrl}/) do |c|
+        case c
+        when '"', "\\", "#" then "\\#{c}"
+        else CONTROL_ESCAPES[c] || format("\\u%04X", c.ord)
+        end
+      end
+      "\"#{escaped}\""
     end
 
     def symbol(value)
