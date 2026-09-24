@@ -35,5 +35,19 @@ task :bundle do
   puts "wrote dist/recorder.js"
 end
 
+namespace :docs do
+  desc "Regenerate the README screenshots from the fixture app (headless Chrome)"
+  task :screenshots do
+    FileUtils.mkdir_p("tmp/screenshots")
+    FileUtils.mkdir_p("docs/images")
+    # A copy, because the recorder writes the recorded steps into the spec it runs.
+    FileUtils.cp("docs/screenshots/screenshots_spec.rb", "tmp/screenshots/screenshots_spec.rb")
+    sh({"MAGIC_TEST" => "1", "MAGIC_TEST_HEADLESS" => "1", "MAGIC_TEST_TOOLBAR" => "1",
+        "MAGIC_TEST_SCRIPT" => File.expand_path("docs/screenshots/script.rb"),
+        "MAGIC_TEST_SCREENSHOT_DIR" => File.expand_path("docs/images")},
+      "bin/rspec tmp/screenshots/screenshots_spec.rb")
+  end
+end
+
 task spec: ["spec:unit", "spec:recorder"]
 task default: [:lint, :spec]

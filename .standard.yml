@@ -1,5 +1,6 @@
 ruby_version: 3.2
 ignore:
+  - "docs/screenshots/**/*"
   - 'spec/fixture_app/db/schema.rb'
   - 'spec/fixture_app/public/**/*'
   - 'spec/golden/**/expected.rb'

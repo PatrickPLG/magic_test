@@ -1,0 +1,80 @@
+# Decisions
+
+Every non-obvious choice, with the reason. Newest at the bottom of each section.
+
+## Scope and branches
+
+- **Branch `studiz-recorder-v1` off `semantic-selector-improvements` (`b74ddef`)**, as the brief asks. The harness also named `claude/dazzling-albattani-lcm31k`; the same commits are pushed there so both references resolve, and the PR targets `semantic-selector-improvements`.
+- **Cuprite/Ferrum only.** Selenium and Minitest code paths are gone; `exe/magic test` prints a clear message instead of running Minitest.
+- **Pry is optional.** Detected with `defined?(Pry)`; `open_console` from the toolbar opens it when present, and `flush`/`ok` keep working inside it.
+
+## Toolchain
+
+- **Ruby 3.3.6 locally, 3.2.2 in CI.** The container ships 3.3.6 and no 3.2.2; CI (`.github/workflows/ci.yml`) pins 3.2.2 with `ruby/setup-ruby`. Rails 7.0.8 on Ruby 3.3 needs `concurrent-ruby 1.3.4` (the `Logger` constant regression), pinned in the Gemfile.
+- **Chrome wrapper for the gem's own suite** (`spec/support/bin/chrome`) adds `--no-sandbox` only when running as root (containers); Ferrum deliberately does not add it.
+- **`bin/rspec` / `bin/standardrb` binstubs** because Bundler 4 in the container cannot resolve `bundle exec rspec`.
+- **No Node build step.** The recorder is written as plain ES2017 modules under `app/assets/javascripts/magic_test/src/` and concatenated into one IIFE at request time by `MagicTest::RecorderBundle` (cached per process). `rake bundle` writes `dist/recorder.js` for inspection; eslint runs on the sources in CI.
+
+## Integration with Studiz ("gem-locked")
+
+- **Rack middleware injects `<script src="/__magic_test/recorder.js" defer>`** before `</head>` of every HTML response under `MAGIC_TEST`. Covers the 8 Studiz layouts that never rendered the partial. Verified by `spec/unit/engine_spec.rb` (injects nothing, mounts nothing, adds no middleware when unset).
+- **Engine routes under `/__magic_test`**, prepended to the host routes only under `MAGIC_TEST`. The controller inherits from `ActionController::Base`, not the host's `ApplicationController` (no auth filters, no locale hooks). The endpoint action is named `bootstrap`, because `config` is already `ActionController::Base#config` (that collision recursed until stack overflow).
+- **`_support.html.erb` is a no-op shim**; the 7 other legacy partials are deleted. `LegacyOverrideCheck` warns loudly at boot when `app/views/magic_test` exists in the host; the JS neutralises the legacy globals if they still load.
+- **Helpers are included into `type: :system` always in the test env** via `RSpec.configure` at `after_initialize` (rspec-core is loaded by the `rspec` command before the environment) and `ActiveSupport.on_load(:action_dispatch_system_test_case)`.
+- **`driven_by :cuprite` re-registers the driver.** rspec-rails' `driven_by` calls `ActionDispatch::SystemTesting::Driver#register`, which replaces the `:cuprite` registration with Rails defaults (headless, 1024×768, no `js_errors`). Studiz calls it in every spec's `before`, so the rails_helper's `headless: ENV['MAGIC_TEST'] ? false : …` never applies. `MagicTest::CupriteDefaults` (prepended to `Capybara::Cuprite::Driver#initialize` under `MAGIC_TEST`) forces headed mode (unless `MAGIC_TEST_HEADLESS`), a 1200×800 window and a 30 s process timeout. The fixture suite passes its driver options through `driven_by :cuprite, options: …` for the same reason.
+
+## Recording semantics
+
+- **The server is the source of truth.** Events go to `POST /__magic_test/events` with `fetch(keepalive: true)`; a sessionStorage buffer replays anything unacked after navigation; the server dedupes by event id. Page loads, redirects, params, flash, rendered templates, Warden user and SQL writes come from the middleware, not the browser.
+- **The page load that predates the session is not a step.** `visit x; magic_test` would otherwise duplicate the `visit`. The JS compares `performance.timeOrigin` with the session's `started_at` and tags that navigation `initial`.
+- **Typing is read from the element on change/blur/Enter/submit/unload**, never reconstructed from key events. Paste, autofill, Backspace and mid-text edits are therefore exact.
+- **Dialogs are intercepted in the page, not in Cuprite.** Cuprite answers every native dialog immediately unless an expectation is queued (`Capybara::Cuprite::Page#prepare_page`), so a person never sees it. The recorder replaces `window.confirm/alert/prompt` while a session is recording: `confirm` shows the decision in the toolbar and returns `false`; on Accept the triggering element is clicked again with the stub answering `true` once (rails-ujs looks `window.confirm` up at click time, so `data-confirm` works; the re-click is untrusted and therefore not recorded twice). `alert` records itself and shows a notice. Proven by audit #15/#16.
+- **Hover is an explicit toolbar action only** (Alt+Shift+H, then click the element). The always-on `mouseover` + MutationObserver approach from `hover-feature` was rejected (see AUDIT.md). The branch's "did something visibly open" check survives as the green/amber badge on the hover step.
+- **Chosen search text is folded into the pick**; opening the dropdown alone is not a step. Emitted as `magic_chosen_select('Fest', from: 'Kategori')`, which locates the underlying `<select>` by label/id/name with `visible: false` and therefore does not need a stable container id.
+- **Per-element de-duplication (300 ms, same element, same intent)** replaces the global 150 ms debounce. Only trusted events are honoured. Listeners are capture-phase on `window` (see below: `document` was not early enough); the target is resolved at `pointerdown`.
+- **Modal scoping:** while a Studiz modal (`#ajax-modal`, `#full-view-modal`, `#image-cropper-modal` or any `.modal.show[id]`) is open, steps inside it are wrapped in `within('<modal>')`, merged into one block; uniqueness is evaluated inside the modal.
+- **"Replay pending" verifies locators without performing actions.** Running the pending steps for real would mutate the page the person is looking at; resolving every locator (with Capybara's own `all` counts, inside the recorded scopes) proves the same thing safely.
+
+## Locators
+
+- **Capybara's XPath, not an imitation.** Ruby compiles `Capybara::Queries::SelectorQuery#xpath(true/false)` for `link_or_button`, `link`, `button`, `fillable_field`, `select`, `checkbox`, `radio_button`, `field`, `file_field` and `option` with a placeholder locator; the browser substitutes an XPath literal (with `concat()` for quotes), runs `document.evaluate`, applies Capybara's node filters (visibility via Cuprite's own `_cuprite.isVisible` when present, `disabled?` with Cuprite's XPath) and counts. `match: :smart` is reproduced as "exact matches if any, else partial; exactly one". Parity is proven against `page.all` in `spec/recorder/parity_spec.rb`.
+- **Ranking:** semantic + unique globally (green) → semantic + unique inside a stable scope (amber, `within`) → stable CSS (amber) → positional inside a stable scope (red, `# magic_test: REVIEW`). Never absolute XPath.
+- **I18n keys are resolved in Ruby** from the merged backend tree (`I18n.backend.translations`), so duplicate `activerecord.attributes` blocks resolve like `I18n.t` (last wins). Several keys → literal + amber + candidate keys in a REVIEW comment; the template scope from `render_template.action_view` breaks ties.
+- **Dynamic-value filter is applied twice**, in the browser (known ids from the session, regexes) and again in Ruby before picking, because ids can become "known" after the event was recorded.
+
+## Setup scaffolding
+
+- Setup is suggested, never inserted: the sign-in line (from the Warden user the middleware saw and the example's `let`s) and `let!` factory lines (from route params that no `let` explains, with `belongs_to` associations mapped to known lets) show in the toolbar's "Setup for the next run" box. Reason: the session runs after the example's setup already ran; the person accepts, re-runs, and recording resumes above `magic_test`.
+
+## Test harness
+
+- **Scripted human runs inside the recording process** (`MAGIC_TEST_SCRIPT=file`), in a background thread, driving the page with Ferrum mouse/keyboard (CDP-trusted input) and talking to the same HTTP endpoints as the toolbar. A parent-process driver attaching a second CDP client to the same Chrome was considered and rejected: two clients on one target and cross-process coordinate math are fragile, and nothing about the recorder's behaviour differs. Capybara's own `fill_in`/`select`/`check` under Cuprite dispatch JavaScript (untrusted) events, so the scripted human never uses them for input; it does use Capybara finders for waiting element lookup.
+- **Recorder specs run in a second RSpec process** (`MAGIC_TEST=1 MAGIC_TEST_HEADLESS=1 bin/rspec --tag recorder`) because middleware and routes are installed at boot only under `MAGIC_TEST`; the unit process proves they are absent.
+- **JS unit tests run in the real Chromium** through a 40-line harness (`spec/js/harness.js`) loaded into a fixture page; one RSpec example per test file reports the failures. No Node test runner, so the suite stays offline and uses the same browser as the recorder.
+- **Golden flows** are `spec/golden/<name>/{flow.rb,expected.rb}` (`flow.rb` holds the spec's setup, the starting `visit` and the scripted human's actions); the runner records in a subprocess, removes the `magic_test` line, replays the generated spec three times on a fresh database, rubocops it with Appendix D's rules and diffs it against `expected.rb`.
+
+## Prior art (addendum §0.1)
+
+Studied as reference designs; none added as a dependency.
+
+- **Upstream `bullet-train-co/magic_test`** (skimmed `clean-up-javascript`, `features/implement-alert-actions`, `features/remind-users-to-assert-on-new-page`, `features/notify-when-js-is-empty`, `107-update-*`). Taken: nothing structural. `implement-alert-actions` wraps `window.alert/confirm` to flag a Capybara action — the same idea as the dialog stub above, but it still lets the native dialog run and emits a bare `accept_alert` *after* the click instead of the block form Capybara needs; rejected. `remind-users-to-assert` opens a blocking modal on every page load; the intent (nudge to assert after navigation) is served by the toolbar's non-blocking flash/current-path suggestions instead. `clean-up-javascript` is semicolons and spacing. `107-*` are lock-file bumps.
+- **Playwright codegen.** Taken: rank by role/semantics, then text/label, then test ids, then CSS, and verify every candidate against the real matching engine before emitting it — that is exactly the Capybara-XPath parity design. Playwright's "test-id first" tier is kept as a CSS candidate (`data-test`, `data-testid`) but Studiz has none, so it never wins there. Rejected: Playwright's own locator language (`getByRole`) has no Capybara equivalent; emitting `find(:css)`/`click_on` is what Studiz's specs read.
+- **Chrome DevTools Recorder.** Taken: the step schema — one recorded step carrying several fallback selectors plus its context (frame, target/window) — is the shape of the event log: each event holds all candidate locators with their match counts, the window id, the frame locator, the open modal and the observed effects, so steps can be re-rendered (I18n toggle, locator choice, deletion) and replay-verified without re-recording. Rejected: DevTools' `offsetX/offsetY` click coordinates and `waitForElement` steps — Capybara waits for elements itself, and coordinates are exactly the brittleness the brief forbids.
+- **capybara-lockstep.** Not a dependency and not needed: generated code and `magic_*` helpers pass the 3/3 replay bar with Capybara's own waiting (`have_*`, `assert_no_selector`, `synchronize`). Mentioned in MIGRATION_STUDIZ.md only as an optional, separately-tested follow-up for Studiz's 371 existing `sleep` calls.
+
+## Adjustments made after the prior-art review
+
+- Event log: added an explicit `effects` object per event (`xhr`, `navigation`, `window_opened`, `modal_opened`) instead of inferring effects at build time, following the DevTools Recorder "context travels with the step" principle. Assertion events now carry `candidates` too, so the same locator picker ranks them.
+
+## Found while making the golden flows pass
+
+- **Listeners moved from `document` to `window` (capture).** Bootstrap 5 registers its data-api handlers on `document` with `useCapture=true`; registered earlier, they ran before the recorder's `document` capture listeners and, for dismiss buttons and dropdown toggles, changed the DOM before the candidates were computed (zero counts, wrong text). `window` capture listeners run before anything on `document`. Chosen picks are captured at `pointerdown` for the same reason (Chosen selects on `mouseup` and re-classes the result before `click`).
+- **Events are attributed to the page whose request *started* before them.** A click that navigates finishes the next request within ~70 ms; matching on completion time (with a tolerance) attributed the click to the page it caused, and I18n tie-breaking by template scope silently picked the wrong template. `RequestRecord#started_at` is set on the way in; `Builder#request_for(event)` takes the last HTML page load started before the event's browser timestamp (browser and server share a clock in system tests). Gem templates (absolute paths, e.g. kaminari's `_paginator`) contribute no I18n scope.
+- **The page's locale travels with the step.** `/en/...` pages resolve against the English catalogue and emit `I18n.t('key', locale: :en)`, because the replaying spec runs in the default locale (`da`). Interpolation templates made only of placeholders (Rails' `errors.format`, `"%{attribute} %{message}"`) are excluded from the reverse index: they match any two words.
+- **Save commits the value being typed.** Toolbar Save/Save & finish/Replay/Console and the scripted human's equivalents first commit a value still being typed and wait for the transport queue to drain, so "type, then click Save" never loses the last fill.
+- **Toolbar off in scripted runs** (`MAGIC_TEST_SCRIPT` set and `MAGIC_TEST_TOOLBAR` unset): the panel covered modal buttons at 1200×800 and the scripted human clicks at real coordinates. Humans always get it.
+- **Repeated nested-field labels get an `nth` scope**: `within(all('div.ticket-type-fields', minimum: 2)[1]) do … end` when the same label appears in several sibling groups with no stable ancestor. Bootstrap/simple_form state classes (`form-group-valid`, `is-invalid`, `chosen-with-drop`, `result-selected`, `hover`, `focus`, …) are never used as containers.
+- **Hover records the element under the pointer** (Alt+Shift+H after moving the mouse) as well as the next click; link/button candidates are ranked first so the step reads `find_link(I18n.t('nav.help')).hover`. The fixture app gained a jQuery `mouseenter` help menu because Studiz's hover menus open that way; the "no visible effect" review stays for hovers that open nothing.
+- **DB suggestions on every event** (not only navigations), with a singular-resource fallback for `reload` suggestions and `Date.new(...)` literals for date columns.
+- **`MAGIC_TEST_DEBUG_DIR=dir`** writes the raw event log, request log and steps as JSON when a session ends; it is how the two findings above were diagnosed and is documented for troubleshooting.
+- **Screenshots instead of a GIF in the README.** The container has neither ImageMagick nor Pillow, and writing a GIF encoder by hand is not worth a documentation image. `rake docs:screenshots` regenerates the PNGs from the fixture app in headless Chrome.

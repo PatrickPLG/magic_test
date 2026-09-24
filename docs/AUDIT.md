@@ -85,4 +85,19 @@ Already an ancestor of `semantic-selector-improvements` (`git merge-base --is-an
 
 ## Status after the rewrite
 
-See the bottom of this file once the rewrite is complete: every regression test above passes against the new recorder (`bin/rspec spec/audit`).
+Every regression test above passes against the new recorder. The browser
+examples run in the MAGIC_TEST process (the engine only injects the recorder
+and mounts its routes when `MAGIC_TEST` is set), the Ruby-side ones in both:
+
+```
+$ MAGIC_TEST=1 MAGIC_TEST_HEADLESS=1 bin/rspec spec/audit
+52 examples, 0 failures
+
+$ bin/rspec spec/audit/ruby_side_spec.rb spec/system
+30 examples, 0 failures
+```
+
+Ruby-side examples were re-pointed from the legacy API (`generate_action_code`,
+`get_last_caller`, `flush` caller arithmetic) to the rewrite's API
+(`Codegen::Builder`, `CallSite`, `SpecWriter`, `Session`, `exe/magic`) with
+the same intent; the browser examples run unchanged through the adapter.
