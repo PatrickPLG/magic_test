@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      RAILS_ENV: test
+      CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.2"
+          bundler-cache: true
+
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install eslint
+        run: npm ci
+
+      - name: Lint Ruby (standard)
+        run: bin/standardrb
+
+      - name: Lint JavaScript (eslint)
+        run: npx eslint app/assets/javascripts/magic_test/src spec/js
+
+      - name: Unit, helper and "injects nothing" specs (MAGIC_TEST unset)
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: bin/rspec --tag ~recorder
+
+      - name: Recorder specs (audit, JS unit tests, parity, golden flows)
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          MAGIC_TEST: "1"
+          MAGIC_TEST_HEADLESS: "1"
+        run: bin/rspec --tag recorder
+
+      - name: Upload golden-flow logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-logs
+          path: |
+            tmp/golden/**/*.log
+            tmp/golden/**/*_spec.rb
+            spec/fixture_app/tmp/screenshots
