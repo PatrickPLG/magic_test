@@ -157,7 +157,11 @@ RSpec.describe("Audit: Ruby side of the recorder") do
         FileUtils.chmod(0o755, [File.join(fake_bin, "rspec"), File.join(fake_bin, "bundle")])
         specs = [File.join(dir, "spec/system/my spec_spec.rb"), File.join(dir, "spec/system/other_spec.rb")]
         specs.each { |s| FileUtils.mkdir_p(File.dirname(s)) && File.write(s, "") }
-        system({"PATH" => "#{fake_bin}:#{ENV["PATH"]}"}, "ruby", File.expand_path("../../exe/magic", __dir__), "spec", *specs, out: File::NULL, err: File::NULL)
+        # Outside Bundler's environment: under `bundle exec` (CI) Bundler
+        # prepends the bundle's bin dir to PATH, so the real rspec would win.
+        Bundler.with_unbundled_env do
+          system({"PATH" => "#{fake_bin}:#{ENV["PATH"]}"}, "ruby", File.expand_path("../../exe/magic", __dir__), "spec", *specs, out: File::NULL, err: File::NULL)
+        end
         args = File.exist?(log) ? File.read(log).lines.map(&:chomp) : []
         expect(args).to(eq(specs + ["MAGIC_TEST=1"]))
       end

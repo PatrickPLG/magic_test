@@ -1,7 +1,10 @@
 #!/bin/sh
 # Chrome launcher for the gem's own test suite.
-# Resolves the binary (CHROME_BIN, then known locations) and adds --no-sandbox
-# when running as root (containers), which Chrome refuses to do otherwise.
+# Resolves the binary (CHROME_BIN, then known locations) and always adds
+# --no-sandbox: Chrome refuses to sandbox as root (containers), and Ubuntu
+# 24.04 runners (GitHub Actions) block unprivileged user namespaces, so the
+# sandbox fails to start there as a normal user too. --disable-dev-shm-usage
+# keeps Chrome off the small /dev/shm of CI containers.
 BIN="${CHROME_BIN:-}"
 if [ -z "$BIN" ]; then
   for candidate in /opt/pw-browsers/chromium-1194/chrome-linux/chrome \
@@ -17,8 +20,4 @@ if [ -z "$BIN" ]; then
   echo "spec/support/bin/chrome: no Chrome binary found (set CHROME_BIN)" >&2
   exit 127
 fi
-if [ "$(id -u)" = "0" ]; then
-  exec "$BIN" --no-sandbox "$@"
-else
-  exec "$BIN" "$@"
-fi
+exec "$BIN" --no-sandbox --disable-dev-shm-usage "$@"
