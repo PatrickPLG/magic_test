@@ -5,7 +5,7 @@ require "magic_test/version"
 Gem::Specification.new do |spec|
   spec.name = "magic_test"
   spec.version = MagicTest::VERSION
-  spec.authors = ["Andrew Culver", "Adam Pallozzi", "Patrick Giørtz"]
+  spec.authors = ["Andrew Culver", "Adam Pallozzi", "PatrickPLG"]
   spec.email = ["andrew.culver@gmail.com", "adampallozzi@gmail.com", "pg@studiz.dk"]
 
   spec.summary = "Record-and-replay RSpec system-test generator for the Studiz Rails app."

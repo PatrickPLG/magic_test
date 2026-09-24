@@ -1,3 +1,7 @@
-ignore:                 # default: []
-  - 'lib/magic_test/support.rb':
-    - Lint/Debugger
+ruby_version: 3.2
+ignore:
+  - 'spec/fixture_app/db/schema.rb'
+  - 'spec/fixture_app/public/**/*'
+  - 'spec/golden/**/expected.rb'
+  - 'tmp/**/*'
+  - 'vendor/**/*'

@@ -9,5 +9,3 @@
 /spec/fixture_app/db/*.sqlite3-*
 /spec/fixture_app/log/
 /spec/fixture_app/tmp/
-/spec/audit/tmp/
-/spec/golden/tmp/

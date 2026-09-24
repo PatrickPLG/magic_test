@@ -1,9 +1,4 @@
-<% if Rails.env.test? && ENV['MAGIC_TEST'].present? %>
-  <%= render 'magic_test/context_menu' %>
-  <%= render 'magic_test/key_codes' %>
-  <%= render 'magic_test/storage' %>
-  <%= render 'magic_test/finders' %>
-  <%= render 'magic_test/mutation_observer' %>
-  <%= render 'magic_test/javascript_helpers' %>
-  <%= render 'magic_test/listeners' %>
-<% end %>
+<%# magic_test 1.0: the recorder is injected by Rack middleware under MAGIC_TEST.
+    This partial stays as a no-op so existing `render 'magic_test/support'` lines
+    in host layouts (Studiz renders it from ~12 layouts, twice in mail layouts)
+    keep working and render nothing. %>

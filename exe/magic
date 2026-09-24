@@ -1,38 +1,45 @@
 #!/usr/bin/env ruby
+# frozen_string_literal: true
 
-option = ARGV[0]
-file_path = ARGV[1]
+# Usage: bin/magic spec spec/system/some_spec.rb [more specs...] [-- rspec options]
+#
+# Runs the given spec files with MAGIC_TEST=1 through `bundle exec rspec`.
+# Paths are passed as separate arguments (spaces are safe); nothing else is
+# added, so RSpec runs only what you name.
+require "shellwords"
 
-def run_magic_test(suite, option, file_path)
-  system("MAGIC_TEST=1 #{suite} #{option} #{file_path}")
+def usage
+  puts <<~TXT
+    Usage: bin/magic spec path/to/first_spec.rb [path/to/second_spec.rb ...] [-- <rspec options>]
+
+    Runs the listed RSpec files with MAGIC_TEST=1 (headed Chrome, recording toolbar).
+    Environment:
+      MAGIC_TEST_HEADLESS=1   run headless (CI / scripted sessions)
+      MAGIC_TEST_SCRIPT=file  drive the session from a Ruby script instead of a person
+  TXT
 end
 
-case option
+command = ARGV.shift
+case command
+when "spec", "rspec"
+  paths, extra = ARGV.include?("--") ? [ARGV[0...ARGV.index("--")], ARGV[(ARGV.index("--") + 1)..]] : [ARGV, []]
+  if paths.empty?
+    usage
+    exit 2
+  end
+  missing = paths.reject { |p| File.exist?(p.split(":").first) }
+  unless missing.empty?
+    warn "bin/magic: no such file: #{missing.join(", ")}"
+    exit 2
+  end
+  exec({"MAGIC_TEST" => "1"}, "bundle", "exec", "rspec", *paths, *extra)
 when "test"
-  suite = "rails"
-  run_magic_test(suite, option, file_path)
-when "spec"
-  suite = "rspec"
-  run_magic_test(suite, option, file_path)
-when "--help"
-  help_info = %q(
-    Usage: `bin/magic [option] [path/to/file]`
-
-    option = 'test' # will run MiniTest
-    option = 'spec' # will run RSpec
-
-    Assign `file_path` to the path of the file you want to test
-
-    Each run will implicitly pass the `MAGIC_TEST=1` environment variable in order to run Magic Test and it's debugger
-  )
-
-  puts help_info
+  warn "bin/magic: Minitest is no longer supported by this fork; use `bin/magic spec <files>`."
+  exit 2
+when "--help", "-h", nil
+  usage
 else
-  quick_tip = %q(
-    To run Magic Test: `bin/magic [option] [path/to/file.rb]`
-
-    Run `bin/magic --help` for more information
-  )
-
-  puts quick_tip
+  warn "bin/magic: unknown command #{command.inspect}"
+  usage
+  exit 2
 end
