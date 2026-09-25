@@ -2,8 +2,10 @@
 # frozen_string_literal: true
 
 # Usage: bin/magic spec spec/system/some_spec.rb [more specs...] [-- rspec options]
+#        bin/magic new [--tui | --plan plan.yml] [path]
 #
-# Runs the given spec files with MAGIC_TEST=1 through `bundle exec rspec`.
+# `spec` runs the given spec files with MAGIC_TEST=1 through `bundle exec rspec`.
+# `new` starts the new-test wizard (see README, "Starting a new test").
 # Paths are passed as separate arguments (spaces are safe); nothing else is
 # added, so RSpec runs only what you name.
 require "shellwords"
@@ -11,8 +13,10 @@ require "shellwords"
 def usage
   puts <<~TXT
     Usage: bin/magic spec path/to/first_spec.rb [path/to/second_spec.rb ...] [-- <rspec options>]
+           bin/magic new [--tui | --plan plan.yml] [path]
 
-    Runs the listed RSpec files with MAGIC_TEST=1 (headed Chrome, recording toolbar).
+    `spec` runs the listed RSpec files with MAGIC_TEST=1 (headed Chrome, recording toolbar).
+    `new` opens the wizard that writes a spec skeleton (setup, sign-in, visit) and records from there.
     Environment:
       MAGIC_TEST_HEADLESS=1   run headless (CI / scripted sessions)
       MAGIC_TEST_SCRIPT=file  drive the session from a Ruby script instead of a person
@@ -33,6 +37,41 @@ when "spec", "rspec"
     exit 2
   end
   exec({"MAGIC_TEST" => "1"}, "bundle", "exec", "rspec", *paths, *extra)
+when "new"
+  mode = "browser"
+  plan = nil
+  script = nil
+  target = nil
+  args = ARGV.dup
+  until args.empty?
+    arg = args.shift
+    case arg
+    when "--tui" then mode = "tui"
+    when "--plan"
+      mode = "plan"
+      plan = args.shift
+    when "--script" then script = args.shift
+    when "--help", "-h"
+      puts <<~TXT
+        Usage: bin/magic new [path]            browser wizard (opens /__magic_test/new in headed Chrome)
+               bin/magic new --tui [path]      terminal wizard
+               bin/magic new --plan plan.yml   non-interactive: preflight, write the skeleton, record
+        Options: --script file.rb   drive the recording with a scripted human (MAGIC_TEST_SCRIPT)
+      TXT
+      exit 0
+    else target = arg
+    end
+  end
+  if mode == "plan" && (plan.nil? || !File.exist?(plan))
+    warn "bin/magic new --plan: no such file: #{plan.inspect}"
+    exit 2
+  end
+  entry = File.expand_path("../lib/magic_test/wizard/entry_spec.rb", __dir__)
+  env = {"MAGIC_TEST" => "1", "MAGIC_TEST_WIZARD" => mode}
+  env["MAGIC_TEST_WIZARD_PLAN"] = File.expand_path(plan) if plan
+  env["MAGIC_TEST_WIZARD_TARGET"] = target if target
+  env["MAGIC_TEST_SCRIPT"] = File.expand_path(script) if script
+  exec(env, "bundle", "exec", "rspec", entry)
 when "test"
   warn "bin/magic: Minitest is no longer supported by this fork; use `bin/magic spec <files>`."
   exit 2
