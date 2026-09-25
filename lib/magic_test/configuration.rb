@@ -33,7 +33,7 @@ module MagicTest
       @ignored_tables = DEFAULT_IGNORED_TABLES.dup
       @user_for_role = {
         # Studiz: an institution signs in through its leader employee's user.
-        "Institution" => ->(let) { "#{let}.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader]).user" }
+        "Institution" => ->(let) { "#{let}.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader])&.user" }
       }
       @wizard_driven_by = "driven_by(:cuprite)" # first line of the generated `before`; nil to omit
       @login_paths = %w[/users/sign_in /login] # a preflight landing here means "not signed in"

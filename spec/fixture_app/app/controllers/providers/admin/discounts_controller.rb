@@ -66,8 +66,10 @@ module Providers
 
       private
 
+      # Studiz: a provider only sees its own admin pages.
       def set_provider
         @provider = Provider.find(params[:provider_id])
+        render plain: "Forbudt", status: :forbidden unless @provider == current_role
       end
 
       def set_discount

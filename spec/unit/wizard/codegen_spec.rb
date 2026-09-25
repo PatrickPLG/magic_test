@@ -9,7 +9,7 @@ RSpec.describe(MagicTest::Wizard::Codegen) do
   end
 
   def fixture(name)
-    dir = Rails.root.join("tmp/wizard_spec_fixtures")
+    dir = Pathname(File.expand_path("../../../tmp/wizard_spec_fixtures", __dir__)) # outside spec/, so RSpec never loads the copies
     FileUtils.mkdir_p(dir)
     path = dir.join(name)
     FileUtils.cp(File.expand_path("../../fixtures/wizard/#{name}.txt", __dir__), path)
@@ -60,12 +60,12 @@ RSpec.describe(MagicTest::Wizard::Codegen) do
     ]))
     expect(sk.before_lines).to(eq([
       "driven_by(:cuprite)",
-      "Flipper.enable_actor(:beta_dashboard, institution.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader]).user)",
+      "Flipper.enable_actor(:beta_dashboard, institution.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader])&.user)",
       "Flipper.enable(:new_navigation)",
       "travel_to(Time.zone.parse('2026-12-24 10:00'))",
       "page.driver.resize(390, 844)",
       "ActionMailer::Base.deliveries.clear",
-      "magic_sign_in(institution.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader]).user)"
+      "magic_sign_in(institution.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader])&.user)"
     ]))
     expect(sk.it_lines).to(eq(["Sidekiq::Testing.inline! do", "  visit(institution_events_en_path(institution))", "  magic_test", "end"]))
 

@@ -1,8 +1,8 @@
-%h1= t("today.title", date: l(@now.to_date, format: :long))
-%p#today-clock= l(@now, format: :short)
+%h1= t("today.title", date: @now.strftime("%d/%m-%Y"))
+%p#today-clock= @now.strftime("%H:%M")
 - if @events.any?
   %ul#upcoming-events
     - @events.each do |event|
-      %li= "#{event.name} – #{l(event.starts_at, format: :short)}"
+      %li= "#{event.name} – #{event.starts_at.strftime("%d/%m-%Y %H:%M")}"
 - else
   %p.text-muted= t("today.nothing")

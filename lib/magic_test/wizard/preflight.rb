@@ -143,16 +143,24 @@ module MagicTest
         expr = codegen.user_expression
         user = context.instance_eval(expr, "sign-in", 1)
         if user.nil?
-          role = catalogue.factory(plan.signed_in_model.factory)&.class_name
-          fix = (role == "Institution" || role.to_s.end_with?("Institution")) ? "add trait :with_user to let!(:#{codegen.name_for(plan.signed_in)}) (the institution needs a leader employee with a user)" : "add trait :with_user (or check the factory creates the user)"
-          failures << Failure.new("sign_in", "#{expr} is nil: #{role} has no user to sign in with.", fix, "signed_in")
+          failures << Failure.new("sign_in", "#{expr} is nil: #{role_name} has no user to sign in with.", with_user_fix, "signed_in")
           return nil
         end
         user
       rescue Exception => e # rubocop:disable Lint/RescueException
         raise e if e.is_a?(SystemExit) || e.is_a?(Interrupt)
-        failures << classify(e, "sign_in", "signed_in", expr)
+        failures << if e.is_a?(NoMethodError) && e.message.include?("for nil")
+          Failure.new("sign_in", "#{expr} raised #{e.message.lines.first.strip}: #{role_name} has no user to sign in with.", with_user_fix, "signed_in")
+        else
+          classify(e, "sign_in", "signed_in", expr)
+        end
         nil
+      end
+
+      def with_user_fix
+        role = role_name.to_s
+        let = codegen.name_for(plan.signed_in)
+        role.end_with?("Institution") ? "add trait :with_user to let!(:#{let}) (the institution needs a leader employee with a user)" : "add trait :with_user to let!(:#{let}) (or check the factory creates the user)"
       end
 
       def run_setup(failures, user)
@@ -226,11 +234,11 @@ module MagicTest
         if login_path?(path)
           failures << Failure.new("visit", "#{expected} redirected to the login page (#{path}).", plan.guest? ? "the page needs a signed-in user: pick a role" : "the signed-in user was not accepted: does #{codegen.user_expression} resolve to a user that may see this page?", "start.route")
         elsif status == 403
-          failures << Failure.new("visit", "#{expected} answered 403 Forbidden.", "the signed-in #{role_name} does not own that record or may not see this page: check the route params point at the signed-in role's records", "start.route")
-        elsif status == 404
-          failures << Failure.new("visit", "#{expected} answered 404 Not Found.", "a route param points at the wrong let (or the record is not visible to this role)", "start.params")
+          failures << Failure.new("visit", "#{expected} answered 403 Forbidden.", param_hint || "the signed-in #{role_name} does not own that record or may not see this page: check the route params point at the signed-in role's records", "start.route")
+        elsif status == 404 || status == 500
+          failures << Failure.new("visit", "#{expected} answered #{status}#{(status == 404) ? " Not Found" : " (an exception in the app; see log/test.log)"}.", param_hint || "a route param points at the wrong let (or the record is not visible to this role)", "start.params")
         elsif status && status >= 400
-          failures << Failure.new("visit", "#{expected} answered #{status}.", "check the server log (tmp/log or log/test.log)", "start.route")
+          failures << Failure.new("visit", "#{expected} answered #{status}.", "check the server log (log/test.log)", "start.route")
         elsif js_errors.any?
           failures << Failure.new("visit", "JavaScript error on #{path}: #{js_errors.first}", "fix the page's JavaScript; recording runs with js_errors: true and would stop here", "start.route")
         elsif path != expected.sub(/\?.*\z/, "")
@@ -241,6 +249,20 @@ module MagicTest
         raise e if e.is_a?(SystemExit) || e.is_a?(Interrupt)
         failures << classify(e, "visit", "start.route", expr)
         {}
+      end
+
+      # ":institution_id is provider, a Provider" when a param's name and the let's class disagree.
+      def param_hint
+        route = catalogue.route(plan.start.route) or return nil
+        route.params.filter_map do |part|
+          let = plan.start.params[part]
+          model = let && plan.model(let)
+          next unless model
+          klass = catalogue.factory(model.factory)&.class_name
+          expected = part.sub(/_id\z/, "")
+          next if part == "id" || klass.nil? || klass.demodulize.underscore == expected
+          "the route param :#{part} points at #{let} (a #{klass}); it probably needs a let of class #{expected.camelize}"
+        end.first
       end
 
       def screenshot(page)

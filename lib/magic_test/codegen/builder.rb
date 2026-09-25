@@ -39,7 +39,10 @@ module MagicTest
       private
 
       def handle(event)
-        db_suggestions(event) unless %w[navigation].include?(event["kind"])
+        unless %w[navigation].include?(event["kind"])
+          db_suggestions(event)
+          mail_suggestions(event)
+        end
         case event["kind"]
         when "navigation" then navigation(event)
         when "modal" then modal(event)
@@ -227,6 +230,34 @@ module MagicTest
           suggest(:flash, Assertions.content(text_code(msg, event, scopes: record.template_scopes)), "Assert flash #{msg.to_s.truncate(40)}", event)
         end
         db_suggestions(event)
+        mail_suggestions(event)
+      end
+
+      # An email delivered or a Sidekiq job enqueued during the last request.
+      def mail_suggestions(event)
+        record = @session.request_log.all.reverse.find { |r| r.deliveries.present? || r.enqueued_jobs.present? }
+        return unless record && !@suggested_mail_for&.include?(record.id)
+        (@suggested_mail_for ||= []) << record.id
+        Array(record.deliveries).each do |delivery|
+          to = delivery["to"].first.to_s
+          code = "expect(ActionMailer::Base.deliveries.last.to).to(include(#{email_code(to)}))"
+          suggest(:mail, code, "Assert email to #{to}", event, alternatives: ["expect(ActionMailer::Base.deliveries.size).to(eq(#{ActionMailer::Base.deliveries.size}))"])
+        end
+        Array(record.enqueued_jobs).each do |job|
+          klass = job["class"]
+          house = "expect(#{klass}.jobs.size).to(eq(#{job["count"]}))"
+          suggest(:job, house, "Assert #{klass} enqueued", event, alternatives: ["expect(#{klass}).to(have_enqueued_sidekiq_job)"])
+        end
+      end
+
+      # The address as a let expression when a memoised record owns it.
+      def email_code(address)
+        @session.memoized.each do |name, value|
+          [[value, name.to_s], [value.respond_to?(:user) ? value.user : nil, "#{name}.user"]].each do |obj, expr|
+            return "#{expr}.email" if obj.respond_to?(:email) && obj.email.to_s == address
+          end
+        end
+        RubyLiteral.string(address)
       end
 
       def db_suggestions(event)

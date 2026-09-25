@@ -50,7 +50,8 @@ RSpec.configure do |config|
   # Studiz: a fresh Flipper memory adapter with :ml_recommendations and
   # :live_support enabled before every example; Sidekiq queues emptied.
   config.before(:each) do
-    Flipper.instance = Flipper.new(Flipper::Adapters::Memory.new)
+    Flipper.instance = nil # back to the shared adapter (Flipper.instance is thread-local)
+    Flipper.features.each { |f| Flipper.remove(f.key) }
     Flipper.enable(:ml_recommendations)
     Flipper.enable(:live_support)
     Sidekiq::Worker.clear_all

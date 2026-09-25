@@ -69,9 +69,15 @@ module MagicTest
         MagicTest::CallSite.new(path: written.path, line: written.line, source_line: written.source_line, example_line: nil, example_description: codegen.plan.description)
       end
 
-      def record(call_site)
+      def record(call_site, plan = nil)
         puts "magic_test wizard: wrote #{call_site.path}:#{call_site.line}; recording starts now."
-        MagicTest::Session.run(page: context.page, call_site: call_site, example: (defined?(RSpec) ? RSpec.current_example : nil), context: context)
+        run_session = -> { MagicTest::Session.run(page: context.page, call_site: call_site, example: (defined?(RSpec) ? RSpec.current_example : nil), context: context) }
+        # The written spec wraps its steps in Sidekiq::Testing.inline!; the recording must behave the same.
+        if plan&.extras&.sidekiq_inline && defined?(Sidekiq::Testing)
+          Sidekiq::Testing.inline!(&run_session)
+        else
+          run_session.call
+        end
       end
 
       def save_plan(plan)
@@ -100,7 +106,7 @@ module MagicTest
         result = preflight(codegen)
         puts "magic_test wizard: #{result.summary}"
         raise Wizard::Error, result.summary unless result.ok
-        record(write(codegen))
+        record(write(codegen), plan)
       end
     end
   end
