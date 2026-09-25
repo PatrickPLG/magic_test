@@ -3,7 +3,7 @@ require "magic_test/wizard"
 
 RSpec.describe(MagicTest::Wizard::SpecFile) do
   def fixture(name)
-    dir = Rails.root.join("tmp/wizard_spec_fixtures")
+    dir = Pathname(File.expand_path("../../../tmp/wizard_spec_fixtures", __dir__)) # outside spec/, so RSpec never loads the copies
     FileUtils.mkdir_p(dir)
     path = dir.join(name)
     FileUtils.cp(File.expand_path("../../fixtures/wizard/#{name}.txt", __dir__), path)
@@ -37,7 +37,7 @@ RSpec.describe(MagicTest::Wizard::SpecFile) do
   end
 
   it "parses the unparenthesised Studiz style too" do
-    file = described_class.parse(fixture("student_profile_spec.rb"))
+    file = described_class.parse(fixture("legacy_unparenthesised_spec.rb"))
     top = file.blocks.first
     expect(top.description).to(eq("Student profile"))
     expect(top.lets.first.to_h).to(include(name: "student", factory: "student", kwargs: {"automatic_verified" => "true"}))

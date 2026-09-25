@@ -42,6 +42,7 @@ module MagicTest
         @plans = []
         @existing_fixture = nil
         @failure_pattern = nil
+        @output_patterns = []
         @target_name = "#{name}_spec.rb"
       end
 
@@ -65,6 +66,13 @@ module MagicTest
       def expect_preflight_failure(pattern)
         @failure_pattern = pattern
       end
+
+      # The wizard's output must contain this (a validator warning, for example).
+      def expect_output(pattern)
+        @output_patterns << pattern
+      end
+
+      attr_reader :output_patterns
 
       def script(&block)
         @script_block = block
@@ -93,6 +101,10 @@ module MagicTest
         FileUtils.mkdir_p(File.dirname(target_path(root)))
         if existing_fixture
           FileUtils.cp(File.join(root, "spec/fixtures/wizard", existing_fixture), target_path(root))
+          # Studiz files `require_relative '../support/system_auth_helper'`; point that at the suite's helper.
+          support = File.join(work_dir(root), "spec", "support")
+          FileUtils.mkdir_p(support)
+          File.write(File.join(support, "system_auth_helper.rb"), "require #{File.join(root, "spec/support/system_auth_helper").inspect}\n")
         end
         logs = []
         plans.each_with_index do |yaml, i|
@@ -107,6 +119,9 @@ module MagicTest
           elsif !status.success?
             raise "wizard run failed (see #{work_dir(root)}/record#{i + 1}.log):\n#{out.lines.last(40).join}"
           end
+        end
+        output_patterns.each do |pattern|
+          raise "expected the wizard output to match #{pattern.inspect}:\n#{logs.last.lines.last(40).join}" unless logs.join.match?(pattern)
         end
         generated = File.read(target_path(root))
         final = generated.lines.reject { |l| l.strip == "magic_test" }.join
