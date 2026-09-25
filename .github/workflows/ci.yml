@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     env:
       RAILS_ENV: test
       CI: "1"
@@ -36,7 +36,7 @@ jobs:
         run: bin/standardrb
 
       - name: Lint JavaScript (eslint)
-        run: npx eslint app/assets/javascripts/magic_test/src spec/js
+        run: npx eslint app/assets/javascripts/magic_test/src app/assets/javascripts/magic_test/wizard spec/js
 
       - name: Unit, helper and "injects nothing" specs (MAGIC_TEST unset)
         env:

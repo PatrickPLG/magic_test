@@ -69,6 +69,9 @@ da:
       student:
         update: "Gem profil"
   nav:
+    new_navigation: "Ny navigation"
+    mobile_profile: "Profil"
+    mobile_today: "I dag"
     events: "Arrangementer"
     students: "Studerende"
     discounts: "Rabatter"
@@ -100,6 +103,7 @@ da:
       continue_to_payment: "Forsæt til betaling"
   discounts:
     index:
+      notes: "Noter"
       title: "Dine rabatter"
       new: "Opret rabat"
       edit: "Rediger"
@@ -169,6 +173,7 @@ da:
     index:
       title: "Studerende"
   home:
+    recommended: "Anbefalet til dig"
     index:
       title: "Forsiden"
       welcome: "Velkommen, %{name}"
@@ -199,3 +204,21 @@ da:
     hints:
       discount:
         cover_image: "Mindst 1200x600 px"
+  beta:
+    title: "Beta-dashboard"
+    intro: "Du ser en side, der kun er slået til for dig."
+    back: "Tilbage til forsiden"
+  today:
+    title: "I dag er det %{date}"
+    nothing: "Ingen arrangementer de næste 7 dage"
+  backoffice:
+    dashboard:
+      title: "Backoffice"
+      leads:
+        one: "%{count} lead"
+        other: "%{count} leads"
+      leads_link: "Se leads"
+  companies:
+    dashboard:
+      title: "Velkommen, %{name}"
+      cvr: "CVR %{cvr}"

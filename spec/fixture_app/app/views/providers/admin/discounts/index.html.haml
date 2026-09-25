@@ -14,6 +14,7 @@
           %h5.card-title= discount.name_da
           %span.badge.bg-secondary.status-badge= t("discounts.statuses.#{discount.status}")
           %span.badge.bg-light.text-dark.js-reminder-count= discount.reminders_sent
+          %span.badge.bg-warning.text-dark.js-note-count{title: t("discounts.index.notes")}= discount.notes.count
           .mt-2.btn-group
             = link_to t("discounts.index.edit"), edit_provider_admin_discount_path(@provider, discount), class: "btn btn-sm btn-outline-primary"
             = link_to t("discounts.index.delete"), provider_admin_discount_path(@provider, discount), method: :delete, data: {confirm: t("discounts.index.confirm_delete")}, class: "btn btn-sm btn-outline-danger"

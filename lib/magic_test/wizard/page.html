@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>magic_test · new system test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #f3f4f6; --panel: #fff; --line: #c9ced6; --ink: #1c1f23; --muted: #6b7280; --head: #1f2937; --blue: #2563eb; --amber: #d97706; --red: #dc2626; --green: #16a34a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  header.top { background: var(--head); color: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; }
+  header.top .title { font-weight: 600; }
+  header.top .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--blue); }
+  header.top .status.err { background: var(--red); }
+  header.top .status.ok { background: var(--green); }
+  main { display: grid; grid-template-columns: 560px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 38px); }
+  .col { overflow: auto; }
+  section.step { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  section.step h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  label.field { display: block; margin: 6px 0; }
+  label.field span.lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  input[type=text], input[type=number], input[type=datetime-local], select, textarea { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; width: 100%; background: #fff; }
+  select[multiple], select[size] { height: auto; }
+  .row { display: flex; gap: 8px; align-items: flex-end; }
+  .row > * { flex: 1; }
+  .picker input { margin-bottom: 4px; }
+  .picker select { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  button { font: inherit; padding: 4px 10px; border-radius: 4px; border: 1px solid #9aa3af; background: #f3f4f6; color: #111; cursor: pointer; }
+  button.primary { background: var(--blue); color: #fff; border-color: #1d4ed8; }
+  button.danger { background: #fff; color: var(--red); border-color: var(--red); }
+  button[disabled] { opacity: .5; cursor: default; }
+  .model { border: 1px dashed var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; }
+  .model h3 { margin: 0 0 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+  .traits label { display: inline-block; margin-right: 8px; font-size: 12px; }
+  .assoc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: center; margin: 3px 0; }
+  .attrs .row { margin: 3px 0; }
+  .issue { padding: 4px 8px; border-radius: 4px; margin: 3px 0; font-size: 12px; }
+  .issue.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  .issue.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  .issue .fix { display: block; color: var(--muted); }
+  .issue button { font-size: 11px; padding: 1px 6px; margin-left: 6px; }
+  .field-error { color: var(--red); font-size: 11px; }
+  pre.code { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; white-space: pre; overflow: auto; min-height: 200px; margin: 0; }
+  .preflight { margin-top: 10px; }
+  .preflight img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; margin-top: 6px; }
+  .preflight .ok { color: var(--green); font-weight: 600; }
+  .preflight .fail { color: var(--red); font-weight: 600; }
+  .actions { display: flex; gap: 8px; margin: 10px 0; align-items: center; }
+  .muted { color: var(--muted); font-size: 11px; }
+  .kbd { font: 10px ui-monospace, monospace; background: #e5e7eb; border-radius: 3px; padding: 0 4px; }
+  .notice { padding: 6px 10px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 4px; margin-bottom: 8px; }
+  .notice.error { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header class="top"><span class="title">magic_test __VERSION__ · new system test</span><span id="status" class="status">planning</span><span class="muted" style="color:#cbd5e1">Fill in the left column; the right column shows the spec the wizard will write. Nothing is written before preflight passes.</span></header>
+<main>
+  <div class="col" id="form"><p class="muted">Loading the catalogue…</p></div>
+  <div class="col">
+    <section class="step">
+      <h2>Skeleton (live preview)</h2>
+      <div id="notice" class="notice hidden"></div>
+      <div id="issues"></div>
+      <pre class="code" id="preview">…</pre>
+      <div class="actions">
+        <button id="preflight" class="primary" disabled>Run preflight</button>
+        <button id="start" class="primary" disabled>Start recording</button>
+        <button id="cancel" class="danger">Cancel</button>
+        <span class="muted" id="path"></span>
+      </div>
+      <div class="preflight" id="preflight-result"></div>
+    </section>
+  </div>
+</main>
+<script src="/__magic_test/wizard.js" defer></script>
+</body>
+</html>

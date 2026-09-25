@@ -7,6 +7,9 @@ Rails.application.routes.draw do
     get "preview", to: "home#preview"
     get "preview_frame", to: "home#preview_frame"
     get "terms", to: "home#terms"
+    get "beta", to: "home#beta"
+    get "today", to: "home#today"
+    get "company", to: "companies#dashboard", as: :company_dashboard
     get "double_render", to: "home#double_render"
 
     resources :institutions, only: [] do
@@ -38,6 +41,7 @@ Rails.application.routes.draw do
 
   # Outside the localised scope, like Studiz's /backoffice, /live_support, /api.
   namespace :backoffice do
+    root "dashboard#index"
     resources :leads, only: [:index, :edit, :update]
   end
 

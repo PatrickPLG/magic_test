@@ -40,7 +40,32 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_24_000001) do
   create_table "institutions_employees", force: :cascade do |t|
     t.integer "institution_id", null: false
     t.string "name"
-    t.boolean "leader", default: false
+    t.string "employee_type", null: false, default: "employee"
+    t.timestamps
+  end
+
+  create_table "admins", force: :cascade do |t|
+    t.string "name"
+    t.timestamps
+  end
+
+  create_table "companies", force: :cascade do |t|
+    t.string "name"
+    t.string "cvr", null: false
+    t.timestamps
+  end
+
+  create_table "team_members", force: :cascade do |t|
+    t.string "name"
+    t.string "department"
+    t.timestamps
+  end
+
+  create_table "notes", force: :cascade do |t|
+    t.string "notable_type", null: false
+    t.integer "notable_id", null: false
+    t.integer "author_id"
+    t.text "body"
     t.timestamps
   end
 
@@ -117,6 +142,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_24_000001) do
     t.string "name"
     t.string "email"
     t.string "status", default: "new"
+    t.integer "priority", null: false, default: 1
     t.text "note"
     t.timestamps
   end

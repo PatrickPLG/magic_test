@@ -19,6 +19,10 @@ gem "database_cleaner-active_record", "~> 2.1"
 gem "kaminari", "~> 1.2"
 gem "sqlite3", "~> 1.6"
 gem "puma", "~> 6.4"
+# Studiz feature flags and background jobs (memory adapter, faked jobs in specs).
+gem "flipper", "~> 1.3"
+gem "sidekiq", "~> 7.2"
+gem "rspec-sidekiq", "~> 4.1"
 
 # Rails 7.0.8 + Ruby 3.3 needs concurrent-ruby < 1.3.5 (Logger constant).
 gem "concurrent-ruby", "1.3.4"

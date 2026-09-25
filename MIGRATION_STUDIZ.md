@@ -101,6 +101,27 @@ under `MAGIC_TEST` so recording always gets a headed 1200×800 window with a
 30 s process timeout. `MAGIC_TEST_HEADLESS=1` keeps it headless (CI, scripted
 runs).
 
+## 1.1: the wizard needs no website changes
+
+`bin/magic new` (browser), `bin/magic new --tui` and `bin/magic new --plan`
+run through the same engine routes and middleware as 1.0, in the test
+environment with `MAGIC_TEST` set. They introspect factories, routes, roles
+and Flipper flags from the running app, so nothing is added to the website.
+Two things to check on the first run, because they cannot be verified
+without the real app:
+
+1. `bin/magic new --tui` and pick any role: the catalogue must list the role
+   classes (models with `has_one :user, as: :role`, plus `Institution`
+   through `MagicTest.config.user_for_role`) and the factories with their
+   traits. If a role factory is missing, name it in an initialiser:
+   `MagicTest.config.user_for_role["Institutions::Library::Library"] = ->(let) { "#{let}.user" }`.
+2. Preflight a plan for each role you use most (provider, institution,
+   student, student organisation, backoffice). A factory that needs a trait
+   to produce a user (Studiz's `:with_user`) shows up as a preflight failure
+   with the trait named; a factory with a `default_scope` or a required
+   parent shows up as a validation issue. Neither needs a website change,
+   but both tell you what the wizard will ask for.
+
 ## What to expect on the first run
 
 ```sh

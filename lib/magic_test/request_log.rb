@@ -6,7 +6,7 @@ module MagicTest
   # ids into the dynamic-value detector.
   RequestRecord = Struct.new(
     :id, :at, :method, :path, :fullpath, :status, :location, :content_type,
-    :params, :user, :flash, :templates, :db_changes, :record_ids, :xhr, :html, :locale, :started_at
+    :params, :user, :flash, :templates, :db_changes, :record_ids, :xhr, :html, :locale, :started_at, :deliveries, :enqueued_jobs
   ) do
     def html?
       html

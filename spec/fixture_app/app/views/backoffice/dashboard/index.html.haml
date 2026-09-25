@@ -1,0 +1,3 @@
+%h1= t("backoffice.dashboard.title")
+%p= t("backoffice.dashboard.leads", count: @leads_count)
+= link_to t("backoffice.dashboard.leads_link"), backoffice_leads_path, class: "btn btn-outline-primary"

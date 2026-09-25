@@ -1,0 +1,16 @@
+require 'rails_helper'
+require_relative '../support/system_auth_helper'
+
+RSpec.describe('Student profile', :js, type: :system) do
+  let!(:student) { create(:student, automatic_verified: true) }
+
+  before do
+    driven_by(:cuprite)
+    sign_in_as_student(student)
+  end
+
+  it 'shows the profile' do
+    visit(edit_profile_path)
+    expect(page).to(have_content('Fornavn'))
+  end
+end

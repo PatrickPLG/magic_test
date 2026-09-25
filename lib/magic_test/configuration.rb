@@ -15,6 +15,9 @@ module MagicTest
       :ignored_request_paths, :window_size, :poll_interval_ms, :max_ancestor_depth,
       :command_timeout, :studiz_modals
     attr_reader :ignored_tables
+    # Wizard (1.1): how a signed-in role record resolves to the Devise user.
+    # Role class name => lambda(let_name) returning a Ruby expression string.
+    attr_accessor :user_for_role, :wizard_driven_by, :login_paths
 
     def initialize
       @i18n_keys = true
@@ -28,6 +31,18 @@ module MagicTest
       @command_timeout = 20
       @studiz_modals = %w[#ajax-modal #full-view-modal #image-cropper-modal]
       @ignored_tables = DEFAULT_IGNORED_TABLES.dup
+      @user_for_role = {
+        # Studiz: an institution signs in through its leader employee's user.
+        "Institution" => ->(let) { "#{let}.employees.find_by(employee_type: InstitutionEnum::EmployeeType[:leader])&.user" }
+      }
+      @wizard_driven_by = "driven_by(:cuprite)" # first line of the generated `before`; nil to omit
+      @login_paths = %w[/users/sign_in /login] # a preflight landing here means "not signed in"
+    end
+
+    # The Ruby expression that turns the role let into a Devise user.
+    def user_expression(role_class_name, let)
+      resolver = user_for_role[role_class_name.to_s] || user_for_role[role_class_name.to_s.to_sym]
+      resolver ? resolver.call(let.to_s) : "#{let}.user"
     end
 
     # Always merged with the defaults: `config.ignored_tables = %w[foo]` and

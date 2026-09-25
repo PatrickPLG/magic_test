@@ -17,6 +17,7 @@ require "magic_test/codegen"
 require "magic_test/spec_writer"
 require "magic_test/console"
 require "magic_test/recorder_bundle"
+require "magic_test/wizard_bundle"
 require "magic_test/railtie" if defined?(Rails::Railtie)
 
 # Record-and-replay RSpec system-test generator for the Studiz Rails app.

@@ -3,6 +3,8 @@ ignore:
   - "docs/screenshots/**/*"
   - 'spec/fixture_app/db/schema.rb'
   - 'spec/fixture_app/public/**/*'
+  - 'spec/fixture_app/tmp/**/*'
   - 'spec/golden/**/expected.rb'
+  - 'spec/golden_wizard/**/expected.rb'
   - 'tmp/**/*'
   - 'vendor/**/*'

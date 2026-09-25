@@ -18,11 +18,16 @@ module MagicTest
       request = Rack::Request.new(env)
       collector = RequestCollector.new
       started_at = Time.now.to_f
+      jobs_before = sidekiq_job_counts
       Thread.current[:magic_test_request] = collector
       session_flash = flash_before(env)
       status, headers, body = @app.call(env)
       record = build_record(request, status, headers, collector, session_flash, env)
-      record.started_at = started_at if record
+      if record
+        record.started_at = started_at
+        record.deliveries = collector.deliveries
+        record.enqueued_jobs = enqueued_since(jobs_before)
+      end
       (MagicTest.session&.request_log || MagicTest.pre_session_request_log).add(record) if record && !ignored_path?(request.path)
       if injectable?(request, status, headers)
         body, headers = inject(body, headers)
@@ -43,6 +48,11 @@ module MagicTest
         identifier = payload[:identifier].to_s
         root = defined?(Rails) ? "#{Rails.root}/app/views/" : nil
         collector.templates << ((root && identifier.start_with?(root)) ? identifier.sub(root, "") : identifier)
+      end
+      ActiveSupport::Notifications.subscribe("deliver.action_mailer") do |_name, _s, _f, _id, payload|
+        collector = Thread.current[:magic_test_request]
+        next unless collector
+        collector.deliveries << {"to" => Array(payload[:to]).map(&:to_s), "subject" => payload[:subject].to_s, "mailer" => payload[:mailer].to_s}
       end
       ActiveSupport::Notifications.subscribe("sql.active_record") do |_name, _s, _f, _id, payload|
         collector = Thread.current[:magic_test_request]
@@ -153,13 +163,28 @@ module MagicTest
       [[injected], headers]
     end
 
+    # Sidekiq (faked in specs) queues per worker class, to see what a request enqueued.
+    def sidekiq_job_counts
+      return {} unless defined?(Sidekiq::Testing) && Sidekiq::Testing.respond_to?(:fake?) && Sidekiq::Testing.fake?
+      Sidekiq::Queues.jobs_by_queue.values.flatten.group_by { |j| j["class"].to_s }.transform_values(&:size)
+    rescue => e
+      MagicTest.logger.warn("magic_test: sidekiq job count failed: #{e.message}")
+      {}
+    end
+
+    def enqueued_since(before)
+      after = sidekiq_job_counts
+      after.filter_map { |klass, n| (n - before.fetch(klass, 0)).positive? ? {"class" => klass, "count" => n - before.fetch(klass, 0)} : nil }
+    end
+
     # Per-request buffer filled by ActiveSupport::Notifications subscribers.
     class RequestCollector
-      attr_reader :templates, :sql
+      attr_reader :templates, :sql, :deliveries
 
       def initialize
         @templates = []
         @sql = []
+        @deliveries = []
       end
     end
   end

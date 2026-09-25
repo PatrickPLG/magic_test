@@ -11,6 +11,8 @@
           %li.nav-item= link_to t("nav.messages"), user_messages_path, class: "nav-link"
           %li.nav-item= link_to t("nav.profile"), edit_profile_path, class: "nav-link"
           %li.nav-item= link_to "English", root_path(locale: :en), class: "nav-link"
+          - if Flipper.enabled?(:new_navigation)
+            %li.nav-item= link_to t("nav.new_navigation"), today_path, class: "nav-link"
           -# Studiz-style hover menu: opens on mouseenter (jQuery), not on click.
           %li.nav-item.dropdown.hover-menu#helpMenu
             %a.nav-link.dropdown-toggle{href: "#", role: "button", "aria-expanded" => "false"}= t("nav.help")
@@ -21,6 +23,10 @@
           %span.navbar-text.me-3= current_user.email
         - else
           = render "shared/login_dropdown"
+    -# Studiz: a bottom navigation bar that only exists on small screens (CSS media query).
+    %nav.mobile-nav
+      = link_to t("nav.mobile_profile"), edit_profile_path, class: "mobile-nav-link"
+      = link_to t("nav.mobile_today"), today_path, class: "mobile-nav-link"
     .generalCont
       = flash_messages
     %main.container.mt-4

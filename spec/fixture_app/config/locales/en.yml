@@ -19,6 +19,9 @@ en:
         create: "Save event"
         update: "Save event"
   nav:
+    new_navigation: "New navigation"
+    mobile_profile: "Profile"
+    mobile_today: "Today"
     events: "Events"
     students: "Students"
     discounts: "Discounts"
@@ -49,6 +52,7 @@ en:
       signup: "Sign up"
       continue_to_payment: "Continue to payment"
   home:
+    recommended: "Recommended for you"
     index:
       title: "Home"
       welcome: "Welcome, %{name}"
@@ -69,3 +73,21 @@ en:
     required:
       text: "required"
       mark: "*"
+  beta:
+    title: "Beta dashboard"
+    intro: "You are looking at a page that is only enabled for you."
+    back: "Back to the front page"
+  today:
+    title: "Today is %{date}"
+    nothing: "No events in the next 7 days"
+  backoffice:
+    dashboard:
+      title: "Backoffice"
+      leads:
+        one: "%{count} lead"
+        other: "%{count} leads"
+      leads_link: "See leads"
+  companies:
+    dashboard:
+      title: "Welcome, %{name}"
+      cvr: "CVR %{cvr}"

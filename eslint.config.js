@@ -27,6 +27,26 @@ module.exports = [
     }
   },
   {
+    // The wizard page (lib/magic_test/wizard_bundle.rb): bundle-private `W` namespace, plain DOM.
+    files: ["app/assets/javascripts/magic_test/wizard/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2017,
+      sourceType: "script",
+      globals: {
+        window: "readonly", document: "readonly", setTimeout: "readonly", clearTimeout: "readonly", fetch: "readonly",
+        confirm: "readonly", prompt: "readonly", JSON: "readonly", Object: "readonly", Array: "readonly", Math: "readonly",
+        String: "readonly", parseInt: "readonly", W: "writable"
+      }
+    },
+    rules: {
+      "no-undef": "error",
+      "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }],
+      "no-implicit-globals": "error",
+      "eqeqeq": ["error", "always"],
+      "no-console": ["error", { allow: ["warn"] }]
+    }
+  },
+  {
     files: ["spec/js/**/*.js"],
     languageOptions: {
       ecmaVersion: 2017,
