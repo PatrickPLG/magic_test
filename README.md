@@ -1,7 +1,9 @@
 # magic_test (Studiz edition)
 
 Record a system test by clicking around a real Chrome window; get RSpec +
-Capybara code that replays headless on the first run.
+Capybara code that replays headless on the first run. Since 1.1 a wizard
+(`bin/magic new`) writes the setup first: records, sign-in, start page,
+proven by a preflight before anything is written.
 
 This is a Studiz-specific fork of [magic_test](https://github.com/bullet-train-co/magic_test)
 rebuilt for RSpec, Cuprite and the Studiz stack (Rails 7.0, Bootstrap 5,
@@ -80,6 +82,119 @@ five-minute clean-up of the old integration.
    Leave `magic_test` in place to resume later: it is a no-op unless
    `MAGIC_TEST` is set, and with it set the saved steps replay first and
    recording resumes where you left off.
+
+## Starting a new test with `bin/magic new`
+
+The wizard writes the part you would otherwise type by hand (records,
+sign-in, first visit) and drops you into the recorder on that page:
+
+```sh
+bin/magic new                     # browser wizard in the headed Chrome window
+bin/magic new --tui               # the same questions in the terminal
+bin/magic new --plan plan.yml     # non-interactive: preflight, write, record
+bin/magic new spec/system/provider/discounts_spec.rb   # append to a file
+```
+
+| Form and live preview | Preflight result |
+| --- | --- |
+| ![The wizard form with the skeleton preview](docs/images/wizard-form.png) | ![Preflight passed, with the start page](docs/images/wizard-preflight.png) |
+
+![Recording starts on the preflighted page](docs/images/wizard-recording.png)
+
+It asks for:
+
+1. **A description**, which becomes the `it` name and a leading comment.
+2. **Where the test goes**: a new file (path suggested from the role and
+   the description) or an existing spec. For an existing file the wizard
+   parses its `describe`/`context` blocks, reuses lets whose name, factory
+   and traits match, renames a colliding let from its trait
+   (`archived_discount`) and, when the block lacks the sign-in or the new
+   lets, opens a `context` with its own `before`.
+3. **The signed-in role**: every model with `has_one :user, as: :role`,
+   plus `Institution` (signs in through its leader employee's user), or
+   guest. The role record is a normal `let!`, flagged as signed in.
+4. **Records**: factories with their defined traits, a count
+   (`create_list` above 1), `belongs_to` associations wired to the one let
+   of a matching class (editable: another let, "let the factory build it",
+   or `nil` with a warning when the column is NOT NULL), and attribute
+   overrides validated against the columns and enum values.
+5. **The start page**: the app's named GET routes, the role's namespace
+   first, with the params mapped to lets and the locale (`_en_path` for
+   `/en/...`).
+6. **Extras**: Flipper flags (globally or per actor), `travel_to`, a
+   viewport (desktop 1200×800, tablet, mobile 390×844), cookie consent for
+   guests, `Sidekiq::Testing.inline!` around the steps, an email assertion
+   slot, and fixture files.
+
+Every change re-validates the plan and shows the skeleton on the right.
+**Preflight** then runs the setup inside the real example (FactoryBot,
+DatabaseCleaner, Flipper and `travel_to` behave exactly as in the spec),
+checks each record is valid and persisted, resolves the user, signs in and
+visits the start page in a second window. It reports status, final path,
+JS errors and a screenshot, and on failure names the stage and a fix:
+
+```
+preflight failed at sign_in: institution.employees.find_by(...)&.user is nil: Institution has no user to sign in with.
+  (fix: add trait :with_user to let!(:institution) (the institution needs a leader employee with a user))
+preflight failed at visit: /institutioner/1/studerende answered 403 Forbidden.
+  (fix: the route param :institution_id points at provider (a Provider); it probably needs a let of class Institution)
+```
+
+Nothing is written until preflight passes. Then the skeleton is written
+(atomically, syntax-checked) and recording starts in that same window with
+the preflight data still in place. The written spec reproduces the same
+state when it runs on its own later; the golden wizard flows prove it 3/3.
+
+A written skeleton looks like this:
+
+```ruby
+require 'rails_helper'
+
+# provider renames a discount
+RSpec.describe('Provider renames a discount', :js, type: :system) do
+  let!(:provider) { create(:provider, :with_cvr) }
+  let!(:discount) { create(:discount, :active, provider: provider, name_da: 'Kaffe 20%') }
+
+  before do
+    driven_by(:cuprite)
+    magic_sign_in(provider.user)
+  end
+
+  it 'provider renames a discount' do
+    visit(provider_admin_discounts_path(provider))
+    magic_test
+  end
+end
+```
+
+A plan file for `--plan` is the same information as YAML (the wizard saves
+the last one to `tmp/magic_test/last_plan.yml`):
+
+```yaml
+description: provider renames a discount
+target: { path: spec/system/provider/renames_discount_spec.rb }   # add block: ["Provider discounts"] to append
+signed_in: provider
+models:
+  - { let: provider, factory: provider, traits: [with_cvr] }
+  - { let: discount, factory: discount, traits: [active], attributes: { name_da: Kaffe 20% } }
+start: { route: provider_admin_discounts, params: { provider_id: provider }, locale: da }
+extras: { flags: [{ name: beta_dashboard, actor: provider }], travel_to: "2026-12-24 10:00", viewport: mobile, sidekiq_inline: true, mail_assertion: true }
+```
+
+Configuration for the wizard:
+
+```ruby
+MagicTest.config.user_for_role["Institutions::Library::Library"] = ->(let) { "#{let}.user" }  # role class => user expression
+MagicTest.config.wizard_driven_by = "driven_by(:cuprite)"   # first line of the generated before; nil to omit
+MagicTest.config.login_paths = %w[/users/sign_in /login]     # a preflight landing here means "not signed in"
+```
+
+Limits of the wizard: it introspects, it does not read your seeds or
+`default_scope`s, so a factory that needs data the plan does not name shows
+up as a preflight failure rather than being guessed; attribute overrides are
+strings and integers (dates and times as strings); models added through the
+browser's "add let!" button get the default factory without traits; the
+terminal wizard cannot draw the preflight screenshot.
 
 ## The toolbar
 
@@ -276,15 +391,17 @@ Environment variables:
 ```sh
 bundle install && npm ci                       # eslint only; no build step
 bin/standardrb && npx eslint app/assets/javascripts/magic_test/src spec/js
-bin/rspec --tag ~recorder                      # unit, helpers, "injects nothing" (MAGIC_TEST unset)
-MAGIC_TEST=1 MAGIC_TEST_HEADLESS=1 bin/rspec --tag recorder   # audit, JS unit tests, parity, toolbar, golden flows
+bin/rspec --tag ~recorder                      # unit, helpers, "injects nothing", wizard engine (MAGIC_TEST unset)
+MAGIC_TEST=1 MAGIC_TEST_HEADLESS=1 bin/rspec --tag recorder   # audit, JS unit tests, parity, toolbar, wizard UI/TUI/preflight, golden flows
 bin/rake spec                                  # both passes
 ```
 
 Golden flows (`spec/golden/<name>/flow.rb` + `expected.rb`) record a
 scripted session in a subprocess, replay the generated spec three times on
 fresh databases, run rubocop with Studiz's rules and diff against the
-snapshot. `GOLDEN=a,b` runs a subset, `UPDATE_GOLDEN=1` rewrites snapshots,
+snapshot. Golden wizard flows (`spec/golden_wizard/<name>/flow.rb`) do the
+same from a plan: `bin/magic new --plan` in a subprocess, then the written
+file is replayed 3/3 and diffed. `GOLDEN=a,b` runs a subset, `UPDATE_GOLDEN=1` rewrites snapshots,
 `FIXTURE_APP_DB=db/x.sqlite3` isolates parallel runs.
 
 Design notes are in [docs/DECISIONS.md](docs/DECISIONS.md); the Phase 0 audit

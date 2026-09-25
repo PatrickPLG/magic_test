@@ -20,7 +20,7 @@ desc "Lint Ruby (standard) and JavaScript (eslint when available)"
 task :lint do
   sh "bundle exec standardrb"
   if system("npx --no-install eslint --version > /dev/null 2>&1")
-    sh "npx --no-install eslint app/assets/javascripts/magic_test/src spec/js"
+    sh "npx --no-install eslint app/assets/javascripts/magic_test/src app/assets/javascripts/magic_test/wizard spec/js"
   else
     puts "eslint not installed (npm ci); skipping JS lint"
   end
@@ -36,6 +36,19 @@ task :bundle do
 end
 
 namespace :docs do
+  desc "Regenerate the wizard screenshots (browser wizard driven headless)"
+  task :wizard_screenshots do
+    FileUtils.mkdir_p("docs/images")
+    FileUtils.rm_rf("tmp/wizard_docs")
+    target = File.expand_path("tmp/wizard_docs/spec/system/provider/renames_discount_spec.rb")
+    sh({"MAGIC_TEST" => "1", "MAGIC_TEST_HEADLESS" => "1", "MAGIC_TEST_WIZARD" => "browser", "MAGIC_TEST_TOOLBAR" => "1",
+        "MAGIC_TEST_WIZARD_SCRIPT" => File.expand_path("docs/screenshots/wizard_script.rb"),
+        "MAGIC_TEST_SCRIPT" => File.expand_path("docs/screenshots/wizard_record_script.rb"),
+        "MAGIC_TEST_UI_TARGET" => target, "MAGIC_TEST_WIZARD_TARGET" => target,
+        "MAGIC_TEST_SCREENSHOT_DIR" => File.expand_path("docs/images"), "FIXTURE_APP_DB" => "db/wizard_docs.sqlite3"},
+      "bin/rspec lib/magic_test/wizard/entry_spec.rb")
+  end
+
   desc "Regenerate the README screenshots from the fixture app (headless Chrome)"
   task :screenshots do
     FileUtils.mkdir_p("tmp/screenshots")

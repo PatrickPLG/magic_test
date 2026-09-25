@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.1.0 (2026-09-25)
+
+The "new system test" wizard: from nothing to a passing spec without
+hand-writing setup.
+
+- `bin/magic new [path]` opens a browser wizard at `/__magic_test/new`
+  (test env + MAGIC_TEST only); `bin/magic new --tui` asks the same
+  questions in the terminal; `bin/magic new --plan plan.yml` runs a saved
+  plan non-interactively (also what the golden wizard flows use). The last
+  plan is saved to `tmp/magic_test/last_plan.yml`.
+- One engine behind both: a catalogue introspected at runtime (factories
+  with traits, role classes, `belongs_to` reflections, named GET routes per
+  locale, existing system specs, Flipper flags, fixture files, columns and
+  enums), a validator that auto-wires associations, orders lets parents
+  first, detects cycles and name collisions and attaches a fix to every
+  issue, and a code generator in Studiz house style.
+- Writing into existing specs: describe/context blocks are parsed with
+  RubyVM::AbstractSyntaxTree; lets are reused when name, factory and traits
+  match, renamed from their trait on collision, and a new context with its
+  own before is opened when the block lacks the sign-in or the setup.
+- Extras: Flipper flags (global or per actor), `travel_to`, viewport
+  (desktop/tablet/mobile), cookie consent for guests, `Sidekiq::Testing.inline!`
+  around the steps, `ActionMailer::Base.deliveries` assertions, fixture
+  files, and a warning about the new-student modals.
+- Preflight, mandatory before anything is written: the lets run in order
+  inside the real example, every record must be valid and persisted, the
+  role must resolve to a user (`config.user_for_role`; Institution →
+  leader employee's user), sign-in and the first visit must answer 2xx
+  without a login redirect or JS error. Failures name the stage and a fix.
+  On success the skeleton is written and recording starts in the same
+  session and window.
+- The recorder now suggests `ActionMailer::Base.deliveries` and Sidekiq
+  enqueued-job assertions when a request delivered mail or enqueued a job.
+- `MagicTest.config.user_for_role`, `wizard_driven_by` and `login_paths`.
+
 ## 1.0.0 (2026-09-24)
 
 A rewrite of the recorder for the Studiz Rails app. Branch
