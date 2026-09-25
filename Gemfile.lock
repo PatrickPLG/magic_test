@@ -91,6 +91,7 @@ GEM
       xpath (~> 3.2)
     coderay (1.1.3)
     concurrent-ruby (1.3.4)
+    connection_pool (2.5.5)
     crass (1.0.7)
     cuprite (0.15.1)
       capybara (~> 3.0)
@@ -119,6 +120,8 @@ GEM
       concurrent-ruby (~> 1.1)
       webrick (~> 1.7)
       websocket-driver (~> 0.7)
+    flipper (1.4.2)
+      concurrent-ruby (< 2)
     globalid (1.4.0)
       activesupport (>= 6.1)
     haml (5.2.2)
@@ -232,6 +235,8 @@ GEM
       zeitwerk (~> 2.5)
     rainbow (3.1.1)
     rake (13.4.2)
+    redis-client (0.30.1)
+      connection_pool
     regexp_parser (2.13.0)
     reline (0.7.0)
       io-console (~> 0.5)
@@ -261,6 +266,11 @@ GEM
       rspec-expectations (~> 3.12)
       rspec-mocks (~> 3.12)
       rspec-support (~> 3.12)
+    rspec-sidekiq (4.2.0)
+      rspec-core (~> 3.0)
+      rspec-expectations (~> 3.0)
+      rspec-mocks (~> 3.0)
+      sidekiq (>= 5, < 8)
     rspec-support (3.12.2)
     rubocop (1.88.2)
       json (~> 2.3)
@@ -281,6 +291,12 @@ GEM
       rubocop (>= 1.75.0, < 2.0)
       rubocop-ast (>= 1.47.1, < 2.0)
     ruby-progressbar (1.13.0)
+    sidekiq (7.3.10)
+      base64
+      connection_pool (>= 2.3.0, < 3)
+      logger
+      rack (>= 2.2.4, < 3.3)
+      redis-client (>= 0.23.0, < 1)
     simple_form (5.1.0)
       actionpack (>= 5.2)
       activemodel (>= 5.2)
@@ -342,6 +358,7 @@ DEPENDENCIES
   devise (= 4.9.3)
   factory_bot_rails (~> 6.2.0)
   ferrum (= 0.15)
+  flipper (~> 1.3)
   haml (= 5.2.2)
   kaminari (~> 1.2)
   magic_test!
@@ -353,6 +370,8 @@ DEPENDENCIES
   route_translator (~> 14.1)
   rspec (~> 3.12.0, ~> 3.12)
   rspec-rails (~> 6.0)
+  rspec-sidekiq (~> 4.1)
+  sidekiq (~> 7.2)
   simple_form (= 5.1.0)
   sqlite3 (~> 1.6)
   standard (>= 1.40, >= 0)
@@ -377,6 +396,7 @@ CHECKSUMS
   capybara (3.40.0) sha256=42dba720578ea1ca65fd7a41d163dd368502c191804558f6e0f71b391054aeef
   coderay (1.1.3) sha256=dc530018a4684512f8f38143cd2a096c9f02a1fc2459edcfe534787a7fc77d4b
   concurrent-ruby (1.3.4) sha256=d4aa926339b0a86b5b5054a0a8c580163e6f5dcbdfd0f4bb916b1a2570731c32
+  connection_pool (2.5.5) sha256=e54ff92855753df1fd7c59fa04a398833355f27dd14c074f8c83a05f72a716ad
   crass (1.0.7) sha256=94868719948664c89ddcaf0a37c65048413dfcb1c869470a5f7a7ceb5390b295
   cuprite (0.15.1) sha256=0b3a25b2e408b345dfa0bae8bc5e7f021f913737c746edece9ca9fbb57eba259
   database_cleaner-active_record (2.2.2) sha256=88296b9f3088c31f7c0d4fcec10f68e4b71c96698043916de59b04debec10388
@@ -389,6 +409,7 @@ CHECKSUMS
   factory_bot (6.2.1) sha256=f863e5a7873ef1c6446fdcef8dbb87dc4c3b893d5f75184ae09063d30449d3dd
   factory_bot_rails (6.2.0) sha256=278b969666b078e76e1c972c501da9b1fac15e5b0ff328cc7ce400366164d0a1
   ferrum (0.15) sha256=644bc7d29e30ed2d25e5936c518e0763a108e126ee2ca1a3127a36f14edacb1d
+  flipper (1.4.2) sha256=dca7d65b5ec660b525b6c599e727219ac4994073c855b41b6656b2d91a9cb304
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
   haml (5.2.2) sha256=6e759246556145642ef832d670fc06f9bd8539159a0e600847a00291dd7aae0c
   i18n (1.15.2) sha256=00f9eb62412fe593b2a65a97daa75300d37abb8f7202ec748e94b6d46a9dd1b5
@@ -438,6 +459,7 @@ CHECKSUMS
   railties (7.0.8) sha256=12325c3933efd33f8ead640197dec3b8c27c8d45607dd68b7b925896bf09cc69
   rainbow (3.1.1) sha256=039491aa3a89f42efa1d6dec2fc4e62ede96eb6acd95e52f1ad581182b79bc6a
   rake (13.4.2) sha256=cb825b2bd5f1f8e91ca37bddb4b9aaf345551b4731da62949be002fa89283701
+  redis-client (0.30.1) sha256=5151bc5c7bbfe48623732cdae3b900d8a22dc691cc7cdfacfb351ac55116522d
   regexp_parser (2.13.0) sha256=d105d95d2138954e73914d2fbfb3d0a8f8605a49a3e89864c32e78b9107cb770
   reline (0.7.0) sha256=5b012d8e55dbf9d450f12bde2cf7d15ff546ae80b3f8f3b30e570d431815583d
   responders (3.2.1) sha256=c2772970cbda654c0e772d852e5a851e82cd8e96f5fa958650861ba75b8ffa84
@@ -447,11 +469,13 @@ CHECKSUMS
   rspec-expectations (3.12.4) sha256=846ff8968551a775c4c949825d581f394a517bdf78b68feac471282a1b03e75c
   rspec-mocks (3.12.7) sha256=b2f10a7879781de9448f28e5dc399277d4eac14d577b450e4c04b7897fe4c6a8
   rspec-rails (6.1.1) sha256=bd949e61f89379f410ea1e43133163282f8d977c683ce6d10bf5aef6b1e995b2
+  rspec-sidekiq (4.2.0) sha256=de625b94e4a2abb471a84673a77c86d84a9823494321bbbf9ea0a7dda02442b9
   rspec-support (3.12.2) sha256=de719abdc9d03842c96052be4a2dab8d7fd9314d0b2488b0f755008d071b761d
   rubocop (1.88.2) sha256=8def251c90cd955feb4daa3edc0ab56893250c4ce90ef81e6c80c03f9a939bbf
   rubocop-ast (1.50.0) sha256=b9ca88300da0803ee222ad20cdb30494c0a784eed06fdc35d254b06d662788db
   rubocop-performance (1.26.1) sha256=cd19b936ff196df85829d264b522fd4f98b6c89ad271fa52744a8c11b8f71834
   ruby-progressbar (1.13.0) sha256=80fc9c47a9b640d6834e0dc7b3c94c9df37f08cb072b7761e4a71e22cff29b33
+  sidekiq (7.3.10) sha256=781eb4f65ef36042534ad73d72f211283afb7fee82eec786ada4ed1972ef8e3c
   simple_form (5.1.0) sha256=579ed72479704f09d0542f0eec1a79364848e6e5f2efd79a836935c05fe02a27
   sqlite3 (1.7.3-aarch64-linux) sha256=0ccb8c001cd2617f4801a2c816142d3c9bc299e3f3e0f49e03812f3610b0891c
   sqlite3 (1.7.3-arm-linux) sha256=eb653026d44f8502b74564e585245485a5667d72f8888854e53c561f816541b0

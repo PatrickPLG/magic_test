@@ -17,6 +17,18 @@ class HomeController < ApplicationController
   def terms
   end
 
+  # Flipper-gated per actor: 404 unless the flag is on for the current user.
+  def beta
+    return render(plain: "Ikke tilgængelig", status: :not_found) unless Flipper.enabled?(:beta_dashboard, current_user)
+    render layout: "admin"
+  end
+
+  # Time-dependent: what is on in the next 7 days, relative to Time.current.
+  def today
+    @now = Time.current
+    @events = Events::Event.where(starts_at: @now..(@now + 7.days)).order(:starts_at)
+  end
+
   def double_render
     render layout: "double"
   end

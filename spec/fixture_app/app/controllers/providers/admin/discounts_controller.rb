@@ -50,6 +50,8 @@ module Providers
 
       def send_reminder
         @discount.increment!(:reminders_sent)
+        DiscountMailer.reminder(@discount).deliver_now
+        ReminderFollowUpJob.perform_async(@discount.id)
         respond_to { |format| format.js }
       end
 

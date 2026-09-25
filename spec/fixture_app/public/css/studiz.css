@@ -6,3 +6,9 @@
 .generalCont .alert { z-index: 1050; }
 trix-editor { min-height: 120px; }
 .live-support-panel { background: #fff; border: 1px solid #ccc; padding: 8px; }
+.mobile-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #1f2937; padding: 10px; gap: 16px; justify-content: space-around; z-index: 1040; }
+.mobile-nav-link { color: #fff; text-decoration: none; font-weight: 600; }
+@media (max-width: 500px) {
+  .mobile-nav { display: flex; }
+  .navbar-nav { display: none; }
+}

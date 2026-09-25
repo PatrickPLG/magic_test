@@ -9,6 +9,9 @@ require "rspec/rails"
 require "capybara/rspec"
 require "capybara/cuprite"
 require "database_cleaner/active_record"
+require "sidekiq/testing" # jobs are faked (pushed to an in-memory queue), like rspec-sidekiq in Studiz
+require "rspec-sidekiq"
+RSpec::Sidekiq.configure { |c| c.warn_when_jobs_not_processed_by_sidekiq = false }
 require "magic_test/testing/scripted_human"
 
 # Fresh schema on every boot: the fixture app has no migrations.
@@ -42,6 +45,16 @@ RSpec.configure do |config|
 
   config.before(:suite) do
     DatabaseCleaner.clean_with(:truncation)
+  end
+
+  # Studiz: a fresh Flipper memory adapter with :ml_recommendations and
+  # :live_support enabled before every example; Sidekiq queues emptied.
+  config.before(:each) do
+    Flipper.instance = Flipper.new(Flipper::Adapters::Memory.new)
+    Flipper.enable(:ml_recommendations)
+    Flipper.enable(:live_support)
+    Sidekiq::Worker.clear_all
+    ActionMailer::Base.deliveries.clear
   end
 
   config.before(:each) do |example|

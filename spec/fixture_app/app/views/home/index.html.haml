@@ -19,3 +19,6 @@
   %ul#message-list
     - @messages.each do |m|
       %li= m.body
+- if Flipper.enabled?(:ml_recommendations)
+  %section#recommendations.mt-4
+    %h2= t("home.recommended")
