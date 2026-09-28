@@ -47,6 +47,7 @@ module MagicTest
           end
           result = runner.preflight(codegen)
           say result.summary
+          result.warnings.each { |w| say "  (fix: #{w.fix})" if w.fix }
           result.notes.each { |n| say "  note: #{n}" }
           break if result.ok
           raise Abort, "preflight failed; nothing was written" unless yes?("Edit the plan and run preflight again?", default: true)

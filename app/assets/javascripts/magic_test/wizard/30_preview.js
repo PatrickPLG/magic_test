@@ -103,6 +103,9 @@ W.preview = (function () {
     if (p.ok) {
       els.result.appendChild(h('div', { class: 'ok', id: 'preflight-ok', text: '✓ Preflight passed: ' + p.status + ' ' + p.path + (p.title ? ' — ' + p.title : '') }));
       els.result.appendChild(h('div', { class: 'muted', text: 'Signed in as ' + (p.user || 'guest') + ' · ' + (p.records || []).map(function (r) { return r.let + ' = ' + r.class + '#' + r.id; }).join(', ') }));
+      (p.warnings || []).forEach(function (w) {
+        els.result.appendChild(h('div', { class: 'issue warning' }, [h('strong', { text: w.stage + ': ' }), w.message, w.fix ? h('span', { class: 'fix', text: ' ' + w.fix }) : null]));
+      });
       (p.notes || []).forEach(function (n) { els.result.appendChild(h('div', { class: 'muted', text: 'note: ' + n })); });
     } else {
       els.result.appendChild(h('div', { class: 'fail', id: 'preflight-failed', text: '✗ Preflight failed' }));
