@@ -57,4 +57,11 @@ RSpec.describe("Browser wizard", :recorder, type: :system) do
     expect(written).to(include("\n  it 'provider lists the discounts again' do\n    visit(provider_admin_discounts_path(provider))\n    magic_test\n  end\nend\n"))
     expect(written.scan("let!(:discount)").size).to(eq(1)) # reused, not duplicated
   end
+
+  # B5 (1.2): on the real app clicking a trait's label text or row did not
+  # toggle it (nested labels: the group wrapper was a <label> too).
+  it "toggles a trait from its label text or its row, exactly one, and shows removable chips" do
+    out, = run_wizard("trait_rows_script.rb", target: File.join(work, "spec/system/provider/traits_spec.rb"), db: "traits.sqlite3")
+    expect(out).to(include("B5 OK: label text and row toggle exactly one trait; chips add and remove"), out.lines.grep(/script failed|B5|Error/).join)
+  end
 end
