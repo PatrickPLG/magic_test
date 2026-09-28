@@ -82,8 +82,9 @@ module MagicTest
         else
           file = SpecFile.parse(runner.path_for(Plan::Target.new(path: choice, block: nil)))
           blocks = file.all_blocks
-          block = (blocks.size > 1) ? choose("Which describe/context block", blocks.map { |b| b.path.join(" > ") }, default: blocks.first.path.join(" > ")) : blocks.first.path.join(" > ")
-          plan.target = Plan::Target.new(path: choice, block: blocks.find { |b| b.path.join(" > ") == block }&.path&.last(1))
+          labels = blocks.map { |b| "#{"  " * (b.path.size - 1)}#{b.label}" }
+          label = (blocks.size > 1) ? choose("Which describe/context block", labels, default: labels.first) : labels.first
+          plan.target = Plan::Target.new(path: choice, block: blocks[labels.index(label)].ref)
         end
       end
 

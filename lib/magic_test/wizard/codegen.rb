@@ -127,11 +127,16 @@ module MagicTest
         args.empty? ? helper : "#{helper}(#{args.join(", ")})"
       end
 
+      def block_name
+        ref = plan.target.block
+        ref.is_a?(Hash) ? Array(ref["path"]).join(" > ") : Array(ref).join(" > ")
+      end
+
       # :new_file, :append_it (everything already there) or :new_context.
       def mode
         return :new_file unless spec_file
         # B3: an existing file is never rewritten as a new file.
-        raise Wizard::Error, "block not found in #{spec_file.path}: #{Array(plan.target.block).join(" > ").presence || "(no describe block)"}. Blocks in the file: #{spec_file.blocks_summary}" unless block
+        raise Wizard::Error, "block not found in #{spec_file.path}: #{block_name.presence || "(no describe block)"}. Blocks in the file: #{spec_file.blocks_summary}" unless block
         return :append_it if let_lines.empty? && setup_lines.empty?
         :new_context
       end

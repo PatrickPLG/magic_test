@@ -1,5 +1,19 @@
+require "digest"
+
 module MagicTest
   module Wizard
+    class Error < MagicTest::Error; end unless const_defined?(:Error)
+
+    # B4: a block reference that matches several blocks of the file.
+    class AmbiguousBlock < Error
+      attr_reader :candidates
+
+      def initialize(name, candidates, file)
+        @candidates = candidates
+        super("#{name.inspect} matches #{candidates.size} blocks in #{file}: #{candidates.map(&:label).join(", ")}. Pick one by its line.")
+      end
+    end
+
     # Reads an existing spec with RubyVM::AbstractSyntaxTree (stdlib on 3.2 and
     # 3.3; no parser dependency): describe/context/feature blocks, their lets,
     # before blocks (and the sign-in inside them), examples and line ranges,
@@ -31,14 +45,15 @@ module MagicTest
       end
 
       class Block
-        attr_reader :kind, :description, :first_line, :last_line, :indent, :lets, :before_lines, :sign_ins, :examples, :children, :parent
+        attr_reader :kind, :description, :first_line, :last_line, :indent, :header, :lets, :before_lines, :sign_ins, :examples, :children, :parent
 
-        def initialize(kind:, description:, first_line:, last_line:, indent:, parent: nil)
+        def initialize(kind:, description:, first_line:, last_line:, indent:, parent: nil, header: "")
           @kind = kind
           @description = description
           @first_line = first_line
           @last_line = last_line
           @indent = indent
+          @header = header
           @parent = parent
           @lets = []
           @before_lines = []
@@ -56,6 +71,17 @@ module MagicTest
           "#{kind} '#{description}' (line #{first_line})"
         end
 
+        # Short hash of the header line ("context 'Visuals', :slow do").
+        def header_hash
+          Digest::SHA1.hexdigest(header.to_s)[0, 12]
+        end
+
+        # B4: what a plan stores to find this block again: the full path, the
+        # header hash and the line (path first; header, then line, break ties).
+        def ref
+          {"path" => path, "line" => first_line, "header" => header_hash}
+        end
+
         # Lets visible inside this block: its own plus its ancestors'.
         def visible_lets
           (parent ? parent.visible_lets : []) + lets
@@ -70,7 +96,7 @@ module MagicTest
         end
 
         def to_h
-          {kind: kind, description: description, path: path, first_line: first_line, last_line: last_line, indent: indent,
+          {kind: kind, description: description, path: path, first_line: first_line, last_line: last_line, indent: indent, label: label, ref: ref,
            lets: lets.map(&:to_h), sign_ins: sign_ins.map(&:to_h), examples: examples, children: children.map(&:to_h)}
         end
       end
@@ -102,12 +128,27 @@ module MagicTest
         all_blocks.map(&:label).join(", ")
       end
 
-      # Block by description path (["Provider discounts", "when signed in"]);
-      # nil path or [] → the outermost describe.
-      def find_block(descriptions)
-        descriptions = Array(descriptions).map(&:to_s)
-        return blocks.first if descriptions.empty?
-        all_blocks.find { |b| b.path.last(descriptions.size) == descriptions }
+      # The block a plan refers to. nil / [] → the outermost describe. A Hash
+      # (Block#ref) matches the full path exactly; among same-path duplicates
+      # the header hash, then the line, decides. An Array of descriptions (or a
+      # String) is matched as a path suffix, for hand-written plans. Several
+      # matches raise AmbiguousBlock; none returns nil.
+      def find_block(ref)
+        return blocks.first if ref.nil? || ref == "" || ref == [] || (ref.is_a?(Hash) && Array(ref["path"]).empty?)
+        if ref.is_a?(Hash)
+          path = Array(ref["path"]).map(&:to_s)
+          candidates = all_blocks.select { |b| b.path == path }
+          return candidates.first if candidates.size <= 1
+          by_header = ref["header"].to_s.empty? ? [] : candidates.select { |b| b.header_hash == ref["header"].to_s }
+          return by_header.first if by_header.size == 1
+          by_line = candidates.select { |b| b.first_line == ref["line"].to_i }
+          return by_line.first if by_line.size == 1
+          raise AmbiguousBlock.new(path.last, candidates, self.path)
+        end
+        descriptions = Array(ref).map(&:to_s)
+        candidates = all_blocks.select { |b| b.path.last(descriptions.size) == descriptions }
+        raise AmbiguousBlock.new(descriptions.join(" > "), candidates, self.path) if candidates.size > 1
+        candidates.first
       end
 
       # Lines to insert (already indented) plus the 1-based line number they go
@@ -156,8 +197,9 @@ module MagicTest
         return nil unless GROUP_METHODS.include?(name)
         return nil if call.type == :CALL && !(call.children[0].type == :CONST && call.children[0].children[0] == :RSpec)
         description = string_arg(call) || const_arg(call) || "(dynamic)"
+        header_line = lines[node.first_lineno - 1]
         block = Block.new(kind: name.to_s, description: description, first_line: node.first_lineno, last_line: node.last_lineno,
-          indent: lines[node.first_lineno - 1][/\A */].size, parent: parent)
+          indent: header_line[/\A */].size, parent: parent, header: header_line.strip)
         (parent ? parent.children : blocks) << block
         block
       end

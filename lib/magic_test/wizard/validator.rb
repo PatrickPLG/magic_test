@@ -107,9 +107,15 @@ module MagicTest
         end
         return if plan.target.block.blank?
         return if spec_file.find_block(plan.target.block)
-        add(:error, "target.block", "Block #{Array(plan.target.block).join(" > ").inspect} was not found in #{full}.", "pick one of: #{spec_file.blocks_summary}")
+        add(:error, "target.block", "Block #{block_name(plan.target.block).inspect} was not found in #{full}.", "pick one of: #{spec_file.blocks_summary}")
+      rescue AmbiguousBlock => e
+        add(:error, "target.block", e.message, "pick one of: #{e.candidates.map(&:label).join(", ")}")
       rescue SyntaxError => e
         add(:error, "target.path", "#{path} could not be parsed: #{e.message.lines.first&.strip}", "fix the syntax error or pick another file")
+      end
+
+      def block_name(ref)
+        ref.is_a?(Hash) ? Array(ref["path"]).join(" > ") : Array(ref).join(" > ")
       end
 
       def check_models

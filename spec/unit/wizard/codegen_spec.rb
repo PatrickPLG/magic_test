@@ -43,7 +43,7 @@ RSpec.describe(MagicTest::Wizard::Codegen) do
       "start" => {"route" => "edit_provider_admin_discount", "params" => {"provider_id" => "provider", "id" => "discount"}}))
     sk = described_class.new(p, catalogue, spec_file: spec_file).skeleton
     expect(sk.mode).to(eq(:append_it))
-    expect(sk.reused).to(eq({"provider" => "provider", "discount" => "discount"}))
+    expect(sk.reused.transform_values(&:name)).to(eq({"provider" => "provider", "discount" => "discount"}))
     expect(sk.insert_before_line).to(eq(39))
     expect(sk.source.lines[38, 5].join).to(eq(<<~RUBY.gsub(/^/, "      ").sub(/\A\s+\n/, "\n")))
 

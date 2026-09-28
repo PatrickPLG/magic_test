@@ -51,10 +51,14 @@ W.form = (function () {
       children.push(picker('w-file', files, S.plan.target.path, 'filter files…', function (value) { S.plan.target = { path: value, block: null }; document.getElementById('w-path').value = value; changed(false); }));
     }
     if (S.preview && S.preview.file_exists && S.blocks.length) {
-      var sel = h('select', { id: 'w-block', onchange: function (e) { S.plan.target.block = e.target.value ? [e.target.value] : null; changed(false); } });
+      // B4: options come from the parsed tree (one per block, indented by depth,
+      // with its line); the plan stores the block's exact reference.
+      var sel = h('select', { id: 'w-block', onchange: function (e) { var b = S.blocks[parseInt(e.target.value, 10)]; S.plan.target.block = b ? b.ref : null; changed(false); } });
       S.blocks.forEach(function (b, i) {
-        var last = b.path[b.path.length - 1];
-        sel.appendChild(h('option', { value: last, text: b.path.join(' › ') + ' (' + b.kind + '; lets: ' + b.lets.map(function (l) { return l.name; }).join(', ') + ')', selected: (S.plan.target.block ? S.plan.target.block[0] === last : i === 0) }));
+        var chosen = S.plan.target.block && S.plan.target.block.path;
+        var selected = chosen ? (JSON.stringify(chosen) === JSON.stringify(b.path) && (!S.plan.target.block.line || S.plan.target.block.line === b.first_line)) : i === 0;
+        var lets = b.lets.length ? ' · lets: ' + b.lets.map(function (l) { return l.name; }).join(', ') : '';
+        sel.appendChild(h('option', { value: String(i), text: '\u00a0\u00a0\u00a0'.repeat(b.path.length - 1) + b.label + lets, selected: selected }));
       });
       children.push(field('Describe / context block to add the example to', sel, 'target.block'));
     }
