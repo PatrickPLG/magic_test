@@ -102,6 +102,10 @@ da:
       signup: "Tilmeld dig"
       continue_to_payment: "Forsæt til betaling"
   discounts:
+    show:
+      no_description: "Ingen beskrivelse"
+      archive_now: "Arkivér nu"
+      archived_toast: "Rabatten er arkiveret"
     index:
       notes: "Noter"
       title: "Dine rabatter"

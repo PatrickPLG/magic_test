@@ -177,6 +177,13 @@
       $(this).removeClass("show").find(".dropdown-menu").removeClass("show");
       $(this).find("[role=button]").attr("aria-expanded", "false");
     });
+    // Studiz: clicking a discount card (not its buttons) loads it into #full-view-modal.
+    $(document).on("click", ".deal[data-discount-url]", function (e) {
+      if ($(e.target).closest("a, button, form, input").length) return;
+      var url = $(this).data("discount-url");
+      $("#full-view-modal").modal("show");
+      $.ajax({ url: url, dataType: "script" });
+    });
     // Studiz: re-run chosen after AJAX renders.
     $(document).on("ajax:complete", function () { window.initialize_chosen(); });
   });

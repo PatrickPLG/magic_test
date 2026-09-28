@@ -1,0 +1,3 @@
+$("#full-view-modal").modal("hide");
+$("#discount-card-<%= @discount.id %>").remove();
+window.showToast("<%= j t("discounts.show.archived_toast") %>");

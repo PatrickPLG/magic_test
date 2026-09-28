@@ -4,7 +4,7 @@ module Providers
       layout "admin"
       before_action -> { require_role!(Provider) }
       before_action :set_provider
-      before_action :set_discount, only: [:edit, :update, :destroy, :send_reminder, :archive, :confirm_archive]
+      before_action :set_discount, only: [:edit, :update, :destroy, :send_reminder, :archive, :confirm_archive, :archive_now]
 
       def index
         @discounts = @provider.discounts.where(archived: false).order(:id)
@@ -62,6 +62,12 @@ module Providers
       def confirm_archive
         @discount.update!(archived: true)
         redirect_to provider_admin_discounts_path(@provider), notice: t("discounts.confirm_archive.success")
+      end
+
+      # Studiz: the archive confirm is a remote GET link; archive.js.erb moves the card.
+      def archive_now
+        @discount.update!(archived: true)
+        respond_to { |format| format.js }
       end
 
       private

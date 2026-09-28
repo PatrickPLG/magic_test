@@ -63,4 +63,55 @@ RSpec.describe(MagicTest::Codegen::LocatorPicker) do
     expect(choice.confidence).to(eq(:red))
     expect(choice.review).to(include("matches 3 elements"))
   end
+
+  # B7 (1.2): on the real app the recorder wrote click_on('Halv Pris Rabat
+  # Beskrivelse af rabat') and rejected #discount-card-42 as dynamic. Values
+  # and ids that belong to the example's records are emitted through the lets.
+  describe "record-based locators" do
+    let(:discount) { Struct.new(:id, :name_da, :description).new(42, "Kaffe 10%", "Beskrivelse af rabat") }
+    let(:provider) { Struct.new(:id, :name).new(7, "Café Vivaldi 3") }
+    let(:refs) { MagicTest::RecordRefs.new({"discount" => discount, "provider" => provider}) }
+    let(:picker) { described_class.new(known_ids: %w[42 7], i18n_index: index, i18n_keys: true, record_refs: refs) }
+
+    it "keeps an id that embeds a known record id, interpolating the let" do
+      choice = picker.pick([
+        cand(kind: "css", by: "id", locator: "#discount-card-42"),
+        cand(kind: "css", by: "classes", locator: ".card.deal", text: "Kaffe 10% Beskrivelse af rabat")
+      ], kinds: [])
+      expect(choice.code).to(eq('"#discount-card-#{discount.id}"'))
+      expect(choice.confidence).to(eq(:amber))
+      expect(choice.review).to(be_nil)
+    end
+
+    it "still drops an id whose number could be any of several records" do
+      refs = MagicTest::RecordRefs.new({"discount" => discount, "other" => Struct.new(:id).new(42)})
+      picker = described_class.new(known_ids: %w[42], i18n_index: index, record_refs: refs)
+      choice = picker.pick([cand(kind: "css", by: "id", locator: "#row-42"), cand(kind: "css", by: "classes", locator: "tr.lead")], kinds: [])
+      expect(choice.code).to(eq("'tr.lead'"))
+    end
+
+    it "emits the let's attribute when a link or button text is a record value" do
+      choice = picker.pick([cand(kind: "link_or_button", by: "text", locator: "Kaffe 10%")], kinds: %w[link_or_button])
+      expect(choice.code).to(eq("discount.name_da"))
+      expect(choice.literal).to(eq("Kaffe 10%"))
+      expect(choice.confidence).to(eq(:green))
+      expect(choice.i18n_key).to(be_nil)
+    end
+
+    it "uses the let's attribute in a text: filter and carries it into a within scope" do
+      choice = picker.pick([cand(kind: "css", by: "classes", locator: ".card.deal", text: "Kaffe 10%")], kinds: [])
+      expect(choice.code).to(eq("'.card.deal', text: discount.name_da"))
+      scoped = picker.pick([
+        cand(kind: "link_or_button", by: "text", locator: "Rediger", exact: 2, partial: 2),
+        cand(kind: "link_or_button", by: "text", locator: "Rediger", exact: 1, partial: 1, scope: {"kind" => "row", "css" => ".deal", "text" => "Kaffe 10%"})
+      ], kinds: %w[link_or_button])
+      expect(scoped.scope).to(eq({"kind" => "row", "css" => ".deal", "text" => "Kaffe 10%", "text_code" => "discount.name_da"}))
+    end
+
+    it "flags text that merely contains factory data when nothing stabler is available" do
+      choice = picker.pick([cand(kind: "css", by: "classes", locator: ".card.deal", text: "Kaffe 10% Beskrivelse af rabat")], kinds: [])
+      expect(choice.code).to(eq("'.card.deal', text: 'Kaffe 10% Beskrivelse af rabat'"))
+      expect(choice.review).to(eq("the text contains factory data (discount.name_da, discount.description); prefer a stable id or data attribute on the element"))
+    end
+  end
 end

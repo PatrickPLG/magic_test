@@ -9,9 +9,11 @@
 .row#discount-list
   - @discounts.each do |discount|
     .col-md-6
-      .card.mb-3{id: "discount-card-#{discount.id}", class: "discount-card"}
+      -# Studiz: the whole card (`.deal`) opens the discount in #full-view-modal (remote show.js.erb).
+      .card.mb-3.deal{id: "discount-card-#{discount.id}", class: "discount-card", "data-discount-url" => provider_admin_discount_path(@provider, discount, format: :js)}
         .card-body
           %h5.card-title= discount.name_da
+          %p.card-text.small.text-muted= discount.description.presence || t("discounts.show.no_description")
           %span.badge.bg-secondary.status-badge= t("discounts.statuses.#{discount.status}")
           %span.badge.bg-light.text-dark.js-reminder-count= discount.reminders_sent
           %span.badge.bg-warning.text-dark.js-note-count{title: t("discounts.index.notes")}= discount.notes.count
