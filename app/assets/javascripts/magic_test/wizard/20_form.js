@@ -20,8 +20,13 @@ W.form = (function () {
     W.preview.schedule();
   }
 
+  // B5: the wrapper is a <div>, never a <label>: a <label> around a group of
+  // checkboxes made every click in the group activate its first checkbox.
+  // A single labelable input gets a real <label for=…>; groups get a caption.
   function field(label, input, fieldKey, hint) {
-    var wrap = h('label', { class: 'field', 'data-field': fieldKey || '' }, [h('span', { class: 'lbl', text: label }), input]);
+    var labelable = input && input.id && /^(INPUT|SELECT|TEXTAREA)$/.test(input.tagName);
+    var caption = labelable ? h('label', { class: 'lbl', for: input.id, text: label }) : h('span', { class: 'lbl', text: label });
+    var wrap = h('div', { class: 'field', 'data-field': fieldKey || '' }, [caption, input]);
     if (hint) wrap.appendChild(h('span', { class: 'muted', text: ' ' + hint }));
     return wrap;
   }
@@ -140,7 +145,7 @@ W.form = (function () {
         if (e.target.checked) model.traits.push(t); else model.traits = model.traits.filter(function (x) { return x !== t; });
         changed(false);
       } });
-      box.appendChild(h('label', {}, [cb, ' :' + t]));
+      box.appendChild(h('label', { class: 'trait-option', for: cb.id }, [cb, h('span', { class: 'trait-name', text: ':' + t })]));
     });
     return field('Traits', box, 'traits');
   }

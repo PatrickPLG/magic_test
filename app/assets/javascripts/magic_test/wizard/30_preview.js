@@ -49,6 +49,7 @@ W.preview = (function () {
     var res = S.preview || {};
     els.preview.textContent = (res.skeleton && res.skeleton.source) || (res.ok === false ? '# fix the issues on the left to see the skeleton' : '…');
     els.path.textContent = res.path ? (res.skeleton ? res.skeleton.mode.replace('_', ' ') + ' → ' : '') + res.path : '';
+    renderChips();
     els.issues.innerHTML = '';
     document.querySelectorAll('.field-error').forEach(function (n) { n.remove(); });
     S.issues.forEach(function (issue) {
@@ -94,6 +95,25 @@ W.preview = (function () {
       renderPreflight();
       render();
     }).catch(function (e) { S.status = 'planning'; notice('preflight request failed: ' + e, true); render(); });
+  }
+
+  // B5: one removable chip per chosen trait ("provider :with_cvr ×").
+  function renderChips() {
+    var box = document.getElementById('chips');
+    if (!box) return;
+    box.innerHTML = '';
+    S.plan.models.forEach(function (m) {
+      (m.traits || []).forEach(function (t) {
+        box.appendChild(h('span', { class: 'chip', 'data-let': m.let, 'data-trait': t }, [
+          m.let + ' :' + t,
+          h('button', { type: 'button', class: 'chip-remove', 'aria-label': 'remove :' + t + ' from ' + m.let, title: 'remove :' + t, text: '×', onclick: function () {
+            m.traits = m.traits.filter(function (x) { return x !== t; });
+            W.form.render();
+            schedule();
+          } })
+        ]));
+      });
+    });
   }
 
   function renderPreflight() {

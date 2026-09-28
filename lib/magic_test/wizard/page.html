@@ -17,8 +17,8 @@
   .col { overflow: auto; }
   section.step { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
   section.step h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  label.field { display: block; margin: 6px 0; }
-  label.field span.lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .field { display: block; margin: 6px 0; }
+  .field .lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
   input[type=text], input[type=number], input[type=datetime-local], select, textarea { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; width: 100%; background: #fff; }
   select[multiple], select[size] { height: auto; }
   .row { display: flex; gap: 8px; align-items: flex-end; }
@@ -31,7 +31,13 @@
   button[disabled] { opacity: .5; cursor: default; }
   .model { border: 1px dashed var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; }
   .model h3 { margin: 0 0 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
-  .traits label { display: inline-block; margin-right: 8px; font-size: 12px; }
+  .traits label.trait-option { display: flex; align-items: center; gap: 6px; width: 100%; padding: 3px 6px; margin: 1px 0; border-radius: 4px; font-size: 12px; cursor: pointer; }
+  .traits label.trait-option:hover { background: #eef2ff; }
+  .traits label.trait-option input { margin: 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; min-height: 0; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #e0e7ff; color: #3730a3; border-radius: 10px; padding: 1px 4px 1px 8px; }
+  .chip .chip-remove { font: inherit; line-height: 1; padding: 0 4px; border: 0; background: transparent; color: inherit; cursor: pointer; border-radius: 8px; }
+  .chip .chip-remove:hover { background: #c7d2fe; }
   .assoc { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: center; margin: 3px 0; }
   .attrs .row { margin: 3px 0; }
   .issue { padding: 4px 8px; border-radius: 4px; margin: 3px 0; font-size: 12px; }
@@ -62,6 +68,7 @@
       <h2>Skeleton (live preview)</h2>
       <div id="notice" class="notice hidden"></div>
       <div id="issues"></div>
+      <div id="chips" class="chips" aria-label="chosen traits"></div>
       <pre class="code" id="preview">…</pre>
       <div class="actions">
         <button id="preflight" class="primary" disabled>Run preflight</button>
