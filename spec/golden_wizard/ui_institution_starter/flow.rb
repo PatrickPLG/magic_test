@@ -23,13 +23,15 @@ MagicTest::Testing::WizardFlow.define("ui_institution_starter") do
     h.click("#events_event_category_id_chosen")
     h.type("Fe")
     h.click("#events_event_category_id_chosen .chosen-results li.active-result", text: "Fest")
-    h.click("#events_event_starts_at").type("24/09-2026 14:00").press(:tab)
-    page.has_no_css?(".flatpickr-calendar.open") # the calendar can cover the terms label at other window sizes (the Studiz mirror runs at Rails' 1400×1400)
+    # One Tab lands on the wrapper's "Vælg dato" toggle, still inside flatpickr,
+    # so the calendar stays open (with allowInput, Escape on the input is ignored
+    # too). At Rails' default 1400×1400 window (the Studiz mirror) nothing scrolls
+    # and the open calendar covers the terms label. A second Tab leaves the wrapper,
+    # which closes the calendar the way it does for a person.
+    h.click("#events_event_starts_at").type("24/09-2026 14:00").press(:tab).press(:tab)
+    raise "the date picker is still open" unless page.has_no_css?(".flatpickr-calendar.open", wait: 5)
     h.click("label", text: "Jeg accepterer Studiz' vilkår")
-    unless page.find("#events_event_terms_accepted", visible: :all).checked?
-      page.save_screenshot(File.join(ENV.fetch("MAGIC_TEST_UI_WORK", "tmp"), "terms_not_toggled.png"))
-      raise "the terms checkbox did not toggle (see terms_not_toggled.png)"
-    end
+    raise "the terms checkbox did not toggle" unless page.find("#events_event_terms_accepted", visible: :all).checked?
     h.click_on("Arrangør")
     h.click("#events_event_account_number").type("1234567890")
     h.click_on("Gem arrangement")
