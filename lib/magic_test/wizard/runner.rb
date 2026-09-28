@@ -57,7 +57,33 @@ module MagicTest
 
       def preflight(codegen, new_window: false)
         @preflight = Preflight.new(codegen, context: context)
-        @preflight.run(new_window: new_window)
+        result = @preflight.run(new_window: new_window)
+        record_starter_status(codegen.plan, result)
+        result
+      end
+
+      # Starters remember their last preflight (tmp/magic_test/starters_status.json).
+      def record_starter_status(plan, result)
+        return unless plan.starter
+        Starters.record_status(catalogue.root, plan.starter, ok: result.ok, message: result.ok ? nil : result.failures.first.to_s)
+      end
+
+      # `bin/magic new --template <name> "description"`: the template's plan with the new description.
+      def template_plan
+        name = ENV["MAGIC_TEST_WIZARD_TEMPLATE"].presence or return nil
+        plan = Templates.load(name, catalogue.root)
+        plan.description = ENV["MAGIC_TEST_WIZARD_DESCRIPTION"].to_s if ENV["MAGIC_TEST_WIZARD_DESCRIPTION"].present?
+        plan.target = Plan::Target.new(path: ENV["MAGIC_TEST_WIZARD_TARGET"], block: nil) if ENV["MAGIC_TEST_WIZARD_TARGET"].present?
+        plan
+      end
+
+      # The plan of the previous run (tmp/magic_test/last_plan.yml), if any.
+      def last_plan
+        path = catalogue.root.join("tmp/magic_test/last_plan.yml")
+        path.exist? ? Plan.load(path.to_s) : nil
+      rescue => e
+        MagicTest.logger.warn("magic_test wizard: could not read #{path}: #{e.message}")
+        nil
       end
 
       attr_reader :last_preflight

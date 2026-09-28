@@ -71,10 +71,11 @@ module MagicTest
         end
       end
 
-      attr_accessor :description, :target, :signed_in, :models, :start, :extras
+      attr_accessor :description, :target, :signed_in, :models, :start, :extras, :starter
 
-      def initialize(description: "", target: nil, signed_in: nil, models: [], start: nil, extras: nil)
+      def initialize(description: "", target: nil, signed_in: nil, models: [], start: nil, extras: nil, starter: nil)
         @description = description.to_s
+        @starter = starter.presence&.to_s # the built-in starter this plan came from (1.2), if any
         @target = target.is_a?(Target) ? target : Target.new(path: hash_get(target, "path"), block: hash_get(target, "block"))
         @signed_in = signed_in.presence&.to_s
         @models = models.map { |m| m.is_a?(Model) ? m : Model.from_h(m) }
@@ -103,7 +104,9 @@ module MagicTest
       end
 
       def to_h
-        {"description" => description, "target" => target.to_h, "signed_in" => signed_in, "models" => models.map(&:to_h), "start" => start.to_h, "extras" => extras.to_h}
+        h = {"description" => description, "target" => target.to_h, "signed_in" => signed_in, "models" => models.map(&:to_h), "start" => start.to_h, "extras" => extras.to_h}
+        h["starter"] = starter if starter
+        h
       end
 
       def to_yaml
@@ -112,7 +115,7 @@ module MagicTest
 
       def self.from_h(h)
         h = (h || {}).transform_keys(&:to_s)
-        new(description: h["description"], target: h["target"], signed_in: h["signed_in"], models: h["models"] || [], start: h["start"], extras: h["extras"])
+        new(description: h["description"], target: h["target"], signed_in: h["signed_in"], models: h["models"] || [], start: h["start"], extras: h["extras"], starter: h["starter"])
       end
 
       def self.from_yaml(text)

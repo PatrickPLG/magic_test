@@ -4,6 +4,8 @@ require "magic_test/wizard/plan"
 require "magic_test/wizard/validator"
 require "magic_test/wizard/spec_file"
 require "magic_test/wizard/codegen"
+require "magic_test/wizard/templates"
+require "magic_test/wizard/starters"
 
 module MagicTest
   module Wizard

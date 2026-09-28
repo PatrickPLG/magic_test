@@ -61,7 +61,9 @@ module MagicTest
       def catalogue_payload
         catalogue.to_h.merge(suggested_path: Wizard.suggest_path(nil, ""), viewports: Plan::Extras::VIEWPORTS,
           defaults: {locale: I18n.default_locale.to_s, locales: I18n.available_locales.map(&:to_s), sidekiq: defined?(Sidekiq::Testing) ? true : false, flipper: defined?(Flipper) ? true : false},
-          target: ENV["MAGIC_TEST_WIZARD_TARGET"].presence, version: MagicTest::VERSION)
+          target: ENV["MAGIC_TEST_WIZARD_TARGET"].presence, version: MagicTest::VERSION,
+          starters: Starters.list(catalogue), templates: Templates.list(catalogue.root).map { |t| t.except("path") },
+          last_plan: runner.last_plan&.to_h, template_plan: runner.template_plan&.to_h)
       end
 
       # Validate + skeleton preview; never touches the browser.

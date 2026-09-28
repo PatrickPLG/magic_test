@@ -42,6 +42,8 @@ when "new"
   plan = nil
   script = nil
   target = nil
+  template = nil
+  description = nil
   args = ARGV.dup
   until args.empty?
     arg = args.shift
@@ -51,11 +53,16 @@ when "new"
       mode = "plan"
       plan = args.shift
     when "--script" then script = args.shift
+    when "--template"
+      template = args.shift
+      description = args.shift unless args.first.to_s.start_with?("--")
     when "--help", "-h"
       puts <<~TXT
         Usage: bin/magic new [path]            browser wizard (opens /__magic_test/new in headed Chrome)
                bin/magic new --tui [path]      terminal wizard
                bin/magic new --plan plan.yml   non-interactive: preflight, write the skeleton, record
+               bin/magic new --template <name> "description" [path]
+                                               a saved template (spec/magic_test/templates/<name>.yml): straight to review & preflight
         Options: --script file.rb   drive the recording with a scripted human (MAGIC_TEST_SCRIPT)
       TXT
       exit 0
@@ -71,6 +78,8 @@ when "new"
   env["MAGIC_TEST_WIZARD_PLAN"] = File.expand_path(plan) if plan
   env["MAGIC_TEST_WIZARD_TARGET"] = target if target
   env["MAGIC_TEST_SCRIPT"] = File.expand_path(script) if script
+  env["MAGIC_TEST_WIZARD_TEMPLATE"] = template if template
+  env["MAGIC_TEST_WIZARD_DESCRIPTION"] = description if description
   exec(env, "bundle", "exec", "rspec", entry)
 when "test"
   warn "bin/magic: Minitest is no longer supported by this fork; use `bin/magic spec <files>`."

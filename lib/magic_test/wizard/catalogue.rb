@@ -1,3 +1,5 @@
+require "magic_test/wizard/spec_scanner"
+
 module MagicTest
   module Wizard
     # Everything the wizard can offer, introspected from the running app at
@@ -73,6 +75,52 @@ module MagicTest
       end
 
       attr_reader :factories, :roles, :routes, :files, :flags, :fixture_files
+
+      # ---- learned defaults (1.2 §4) ---------------------------------------------
+
+      # What the host's specs do (factories, traits, sign-ins, start pages), from
+      # SpecScanner, cached per file mtime under tmp/magic_test/catalogue_cache.json.
+      def learned
+        @learned ||= SpecScanner.scan(root)
+      end
+
+      INFRASTRUCTURE_FACTORY = /\A(ahoy_|audit|version|paper_trail|flipper|active_storage|action_text|delayed_job|sidekiq|solid_queue|good_job)/
+
+      # Factories nobody picks for a test's setup by hand; hidden behind "show all".
+      def infrastructure_factory?(name)
+        INFRASTRUCTURE_FACTORY.match?(name.to_s)
+      end
+
+      # Factories for the picker: the role's own factory first, then the ones
+      # specs signed in as that role create most, then by usage, then by name.
+      def ranked_factories(role_class_name = nil)
+        role = role_class_name && self.role(role_class_name)
+        factories.sort_by do |f|
+          [(f.name == role&.factory) ? 0 : 1, -learned.usage(f.name), infrastructure_factory?(f.name) ? 1 : 0, f.name]
+        end
+      end
+
+      # Routes for the picker: the role's most visited start pages first, then
+      # its namespace, then by name. Only named GET routes are in `routes`.
+      def ranked_routes(role_class_name = nil)
+        key = role_key(role_class_name)
+        visits = learned.route_visits(key)
+        preferred = preferred_namespaces(role_class_name)
+        routes.sort_by do |r|
+          [-visits.fetch(r.name, 0), preferred.index(r.namespace) || ((r.namespace == "public") ? preferred.size : preferred.size + 1), r.name]
+        end
+      end
+
+      # "provider" for Provider, "institution" for Institution, "guest" for nil.
+      def role_key(role_class_name)
+        return SpecScanner::GUEST if role_class_name.nil? || role_class_name == GUEST
+        role_class_name.to_s.demodulize.underscore
+      end
+
+      # The most common trait combination for a factory plus the number of spec files using it.
+      def default_traits(factory_name)
+        learned.default_traits(factory_name)
+      end
 
       def factory(name)
         name = name.to_s
@@ -165,7 +213,24 @@ module MagicTest
           factories: factories.map(&:to_h), roles: roles.map(&:to_h), routes: routes.map(&:to_h), files: files,
           flags: flags.map(&:to_h), fixture_files: fixture_files,
           associations: factories.to_h { |f| [f.name, associations_for(f.name).map(&:to_h)] },
-          attributes: factories.to_h { |f| [f.name, attributes_for(f.name)] }
+          attributes: factories.to_h { |f| [f.name, attributes_for(f.name)] },
+          learned: learned_payload
+        }
+      end
+
+      # For the pickers: per factory its usage, default traits and combinations;
+      # per role key the visited routes and the sign-in factory; infrastructure flags.
+      def learned_payload
+        {
+          files: learned.files,
+          factories: factories.to_h do |f|
+            traits, files = learned.default_traits(f.name)
+            [f.name, {usage: learned.usage(f.name), default_traits: traits, default_traits_files: files,
+                      combinations: learned.trait_combinations(f.name).map { |c, n| {traits: c, files: n} },
+                      kwargs: learned.common_kwargs(f.name), infrastructure: infrastructure_factory?(f.name)}]
+          end,
+          routes: learned.routes,
+          sign_ins: learned.sign_ins.keys.to_h { |k| [k, learned.sign_in_for(k)] }
         }
       end
 
