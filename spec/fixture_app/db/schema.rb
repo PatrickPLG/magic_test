@@ -27,6 +27,7 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_24_000001) do
   create_table "providers", force: :cascade do |t|
     t.string "name"
     t.string "registration_number"
+    t.text "description_en"
     t.timestamps
   end
 

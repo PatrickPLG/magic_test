@@ -31,6 +31,23 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
     expect(File.exist?(root.join("spec/system/x_spec.rb"))).to(be(false))
   end
 
+  # B2 (1.2): Studiz's `create(:provider, :with_cvr)` saves, but `valid?` is
+  # false afterwards ("Company description en Must have english description").
+  # RSpec accepts that; preflight must too, with a warning instead of a block.
+  it "passes a record that saved but is invalid afterwards, with a warning" do
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
+      "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
+    expect(result.failures).to(be_empty)
+    expect(result.ok).to(be(true))
+    expect(result.status).to(eq(200))
+    w = result.warnings.first
+    expect(w.stage).to(eq("records"))
+    expect(w.message).to(eq("let!(:provider) is persisted but would not pass validation if re-saved: Description en Must have english description."))
+    expect(w.fix).to(include("RSpec accepts this", ":with_english_company_description"))
+    expect(result.summary).to(include("preflight passed: 200 /udbydere/", "preflight warning at records: let!(:provider) is persisted but would not pass validation"))
+    expect(result.to_h[:warnings].first[:message]).to(eq(w.message))
+  end
+
   it "reports an invalid record with the validation errors and a fix" do
     result = preflight(plan("signed_in" => "company", "models" => [{"let" => "company", "factory" => "company", "attributes" => {"cvr" => ""}}],
       "start" => {"route" => "company_dashboard"}))
@@ -88,6 +105,6 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
     p = plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_gold"]}], "start" => {"route" => "root"})
     v = runner.validate(p)
     expect(v.errors.first.message).to(eq("Factory :provider has no trait :with_gold."))
-    expect(v.errors.first.fix).to(eq("known traits: :with_cvr, :with_user"))
+    expect(v.errors.first.fix).to(eq("known traits: :with_cvr, :with_english_company_description, :with_user"))
   end
 end

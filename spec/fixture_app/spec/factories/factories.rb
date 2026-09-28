@@ -52,6 +52,10 @@ FactoryBot.define do
     trait :with_cvr do
       registration_number { "12345678" }
     end
+
+    trait :with_english_company_description do
+      description_en { "Coffee and cake" }
+    end
   end
 
   factory :institution do
