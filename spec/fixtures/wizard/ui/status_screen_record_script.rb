@@ -9,9 +9,11 @@ wizard_window = (page.windows - [recording_window]).first
 def status_text(page)
   page.evaluate_script("(document.getElementById('recording-status') || {}).textContent || ''")
 end
+
 def count_text(page)
   page.evaluate_script("(document.getElementById('recording-count') || {}).textContent || ''")
 end
+
 def wait_until(what, timeout: 10)
   deadline = Time.now + timeout
   until yield
