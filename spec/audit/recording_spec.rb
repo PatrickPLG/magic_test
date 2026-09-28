@@ -3,7 +3,7 @@ require "rails_helper"
 # Phase 0 audit, browser side: record -> generate, driven with CDP-trusted
 # input. Example names carry the item number from the task's section 1 list.
 RSpec.describe("Audit: recording in the browser", :recorder, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:student) { create(:student, automatic_verified: true).tap { |s| s.user.update!(onboarded: true) } }
   let!(:institution) { create(:institution, :with_user, allow_events: true) }
   let!(:categories) { %w[Fest Foredrag Sport Kultur Musik].map { |n| create(:category, name: n) } }

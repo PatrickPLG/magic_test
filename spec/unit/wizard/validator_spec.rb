@@ -19,6 +19,33 @@ RSpec.describe(MagicTest::Wizard::Validator) do
     validator.issues.map { |i| "#{i.severity}: #{i.field}: #{i.message}" }
   end
 
+  # B3 (1.2): a block name that is not in the existing file is an error that
+  # lists what is there, before anything reaches codegen or the writer.
+  it "errors when the target block is not in the existing file and lists the blocks it found" do
+    dir = Pathname(File.expand_path("../../../tmp/wizard_spec_fixtures", __dir__))
+    FileUtils.mkdir_p(dir)
+    path = dir.join("provider_discounts_spec.rb").to_s
+    FileUtils.cp(File.expand_path("../../fixtures/wizard/provider_discounts_spec.rb.txt", __dir__), path)
+    v = described_class.validate(plan("target" => {"path" => path, "block" => ["Visuals"]}), catalogue)
+    issue = v.errors.find { |i| i.field == "target.block" }
+    expect(issue).not_to(be_nil, messages(v).join("\n"))
+    expect(issue.message).to(eq("Block \"Visuals\" was not found in #{path}."))
+    expect(issue.fix).to(eq("pick one of: describe 'Provider discounts' (line 4), context 'when the discount is archived' (line 18)"))
+  end
+
+  # B4 (1.2): a description that matches several blocks is an error naming them by line.
+  it "errors when the target block description is ambiguous in the existing file" do
+    dir = Pathname(File.expand_path("../../../tmp/wizard_spec_fixtures", __dir__))
+    FileUtils.mkdir_p(dir)
+    path = dir.join("nested_duplicates_spec.rb").to_s
+    FileUtils.cp(File.expand_path("../../fixtures/wizard/nested_duplicates_spec.rb.txt", __dir__), path)
+    v = described_class.validate(plan("target" => {"path" => path, "block" => ["Visuals"]}), catalogue)
+    issue = v.errors.find { |i| i.field == "target.block" }
+    expect(issue).not_to(be_nil, messages(v).join("\n"))
+    expect(issue.message).to(eq("\"Visuals\" matches 2 blocks in #{path}: context 'Visuals' (line 15), context 'Visuals' (line 34). Pick one by its line."))
+    expect(issue.fix).to(eq("pick one of: context 'Visuals' (line 15), context 'Visuals' (line 34)"))
+  end
+
   it "accepts a complete plan and auto-wires the one matching let" do
     v = described_class.validate(plan, catalogue)
     expect(v.errors).to(be_empty, messages(v).join("\n"))
@@ -41,11 +68,12 @@ RSpec.describe(MagicTest::Wizard::Validator) do
     expect(v2.ordered_models.map(&:let)).to(eq(%w[note provider discount]).or(eq(%w[provider discount note])))
   end
 
-  it "reports a missing parent as a warning with a one-click fix, never adding it silently" do
+  it "reports a parent the factory builds as a hint with a one-click fix, never adding it silently" do
     p = plan("models" => [{"let" => "discount", "factory" => "discount"}], "signed_in" => nil, "start" => {"route" => "root"})
     v = described_class.validate(p, catalogue)
-    issue = v.warnings.find { |i| i.field == "models[0].associations.provider" }
-    expect(issue.message).to(include("Missing parent"))
+    expect(v.warnings).to(be_empty, messages(v).join("\n"))
+    issue = v.hints.find { |i| i.field == "models[0].associations.provider" }
+    expect(issue.message).to(eq("The :discount factory builds discount.provider (a Provider) that no let refers to."))
     expect(issue.data[:add_model]).to(eq({"let" => "provider", "factory" => "provider"}))
     expect(p.model("discount").associations).not_to(have_key("provider"))
     expect(p.models.map(&:let)).to(eq(["discount"]))
@@ -108,5 +136,53 @@ RSpec.describe(MagicTest::Wizard::Validator) do
     m = messages(v)
     expect(m).to(include(match(/is not a date\/time/), match(/Unknown viewport watch/), match(/actor "ghost" is not a let/), match(/No fixture file nope.png/)))
     expect(m).to(include(match(/warning: extras.flags: No code checks Flipper flag :unknown_flag/)))
+  end
+
+  # B6 (1.2): missing-parent warnings on the real app were noise (zip_code,
+  # country: parents the factory builds) or wrong (group_leader: a second
+  # provider proposed as let!(:provider)).
+  describe "missing parents" do
+    it "does not warn about a parent the factory builds; it offers a hint to name it instead" do
+      v = described_class.validate(plan("models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}], "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}), catalogue)
+      expect(v.errors).to(be_empty, messages(v).join("\n"))
+      expect(v.warnings.map(&:field)).not_to(include("models[0].associations.zip_code", "models[0].associations.group_leader"))
+      hint = v.hints.find { |i| i.field == "models[0].associations.zip_code" }
+      expect(hint.message).to(eq("The :provider factory builds provider.zip_code (a ZipCode) that no let refers to."))
+      expect(hint.fix).to(eq("also name this record: add let!(:zip_code) { create(:zip_code) } and provider will point at it"))
+      expect(hint.data).to(eq({association: "zip_code", add_model: {"let" => "zip_code", "factory" => "zip_code"}, optional: true}))
+      expect(v.hints.map(&:field)).not_to(include("models[0].associations.group_leader"))
+    end
+
+    it "never auto-wires an optional self-referential association to another let of the same class" do
+      p = plan("models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}, {"let" => "other_provider", "factory" => "provider", "traits" => ["with_cvr"]}],
+        "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "other_provider"}})
+      v = described_class.validate(p, catalogue)
+      expect(v.errors).to(be_empty, messages(v).join("\n"))
+      expect(v.plan.model("provider").associations).not_to(have_key("group_leader"))
+      expect(v.plan.model("other_provider").associations).not_to(have_key("group_leader"))
+      expect(v.issues.map(&:field).grep(/group_leader/)).to(be_empty)
+    end
+
+    it "warns about a NOT NULL parent the factory does not build, with the let to add" do
+      v = described_class.validate(plan("signed_in" => nil, "models" => [{"let" => "payment", "factory" => "payment"}], "start" => {"route" => "root"}), catalogue)
+      w = v.warnings.find { |i| i.field == "models[0].associations.invoice" }
+      expect(w.message).to(eq("Missing parent: payment.invoice is required (invoice_id is NOT NULL) and the :payment factory does not build one; create(:payment) would fail."))
+      expect(w.fix).to(eq("add let!(:invoice) { create(:invoice) }; payment will point at it"))
+      expect(w.data).to(eq({association: "invoice", add_model: {"let" => "invoice", "factory" => "invoice"}}))
+    end
+
+    it "never proposes a let name that is already taken by another record" do
+      v = described_class.validate(plan("signed_in" => nil, "models" => [{"let" => "invoice", "factory" => "discount"}, {"let" => "payment", "factory" => "payment"}], "start" => {"route" => "root"}), catalogue)
+      w = v.warnings.find { |i| i.field == "models[1].associations.invoice" }
+      expect(w.fix).to(eq("add let!(:payment_invoice) { create(:invoice) }; payment will point at it"))
+      expect(w.data[:add_model]).to(eq({"let" => "payment_invoice", "factory" => "invoice"}))
+    end
+
+    it "wires the one let of the parent class and then says nothing" do
+      v = described_class.validate(plan("signed_in" => nil, "models" => [{"let" => "invoice", "factory" => "invoice"}, {"let" => "payment", "factory" => "payment"}], "start" => {"route" => "root"}), catalogue)
+      expect(v.plan.model("payment").associations).to(eq({"invoice" => "invoice"}))
+      expect(v.issues.map(&:field)).to(eq(["models[0].associations.provider"])) # only the invoice's own provider, as a hint
+      expect(v.hints.map(&:field)).to(eq(["models[0].associations.provider"]))
+    end
   end
 end

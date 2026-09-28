@@ -10,7 +10,10 @@ RSpec.describe("Terminal wizard", :recorder, type: :system) do
   let(:target) { root.join("spec/system/provider/renames_spec.rb") }
   let(:output) { StringIO.new }
 
-  before { FileUtils.rm_rf(root) }
+  before do
+    studiz_driven_by
+    FileUtils.rm_rf(root)
+  end
 
   def run_tui(answers)
     runner = MagicTest::Wizard::Runner.new(self)
@@ -23,12 +26,14 @@ RSpec.describe("Terminal wizard", :recorder, type: :system) do
 
   it "asks the questions, preflights in this browser, writes the skeleton and starts recording" do
     answers = [
+      "Blank", # start from
       "provider renames a discount", "new file", target.to_s,
       "Provider", "provider", "with_cvr",
       "discount", "discount", "active", "1", "provider", "name_da=Kaffe 20%", "", "",
       "provider_admin_discounts_path", "provider", "da",
       "", "", "desktop", "", "", "",
       "y", # run preflight
+      "n", # save as template?
       "y"  # write and record
     ]
     recorded, = run_tui(answers)
@@ -43,6 +48,7 @@ RSpec.describe("Terminal wizard", :recorder, type: :system) do
 
   it "shows a validation error with its fix and lets the person stop" do
     answers = [
+      "Blank", # start from
       "lead with a bad priority", "new file", target.to_s,
       "guest", # not signed in
       "lead", "lead", "", "1", "priority=urgent", "", "",

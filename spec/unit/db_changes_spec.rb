@@ -9,6 +9,21 @@ RSpec.describe(MagicTest::DbChanges) do
     expect(described_class.parse("begin transaction")).to(be_nil)
   end
 
+  # B8 (1.2): the statements Postgres emits (bind params, RETURNING, a schema
+  # prefix, query-log comments, CTEs) must parse like SQLite's.
+  it "parses the statement shapes Postgres emits" do
+    expect(described_class.parse('UPDATE "discounts" SET "archived" = $1, "updated_at" = $2 WHERE "discounts"."id" = $3')).to(eq([:update, "discounts"]))
+    expect(described_class.parse('INSERT INTO "discounts" ("name_da", "created_at") VALUES ($1, $2) RETURNING "id"')).to(eq([:insert, "discounts"]))
+    expect(described_class.parse('UPDATE "public"."discounts" SET "archived" = $1 WHERE "discounts"."id" = $2')).to(eq([:update, "discounts"]))
+    expect(described_class.parse('DELETE FROM "public"."discounts" WHERE "discounts"."id" = $1')).to(eq([:delete, "discounts"]))
+    expect(described_class.parse('/*application:Studiz,controller:discounts,action:archive*/ UPDATE "discounts" SET "archived" = $1')).to(eq([:update, "discounts"]))
+    expect(described_class.parse('UPDATE "discounts" SET "archived" = $1 /*application:Studiz*/')).to(eq([:update, "discounts"]))
+    expect(described_class.parse("update discounts set archived = true where id = 2")).to(eq([:update, "discounts"]))
+    expect(described_class.parse('INSERT INTO "discounts" ("id") VALUES ($1) ON CONFLICT ("id") DO UPDATE SET "archived" = excluded."archived"')).to(eq([:insert, "discounts"]))
+    expect(described_class.parse('WITH "recent" AS (SELECT "id" FROM "discounts") UPDATE "discounts" SET "archived" = $1')).to(eq([:update, "discounts"]))
+    expect(described_class.parse('SELECT "discounts".* FROM "discounts" WHERE "discounts"."id" = $1 LIMIT $2')).to(be_nil)
+  end
+
   it "maps tables to models, including namespaced ones" do
     expect(described_class.model_for("events_events")).to(eq(Events::Event))
     expect(described_class.model_for("institutions_employees")).to(eq(Institutions::Employee))
@@ -74,5 +89,46 @@ RSpec.describe(MagicTest::DbChanges) do
       {operation: :insert, table: "events_events", model: "Events::Event", count: 2},
       {operation: :update, table: "users", model: "User", count: 1}
     ))
+  end
+
+  # B8 (1.2): on the real app an UPDATE run by a rails-ujs remote link produced
+  # no suggestion. Two reasons a request can be skipped: it is a GET (Studiz's
+  # archive confirm is a remote GET link), and it carries no form params (the
+  # reload suggestion used to compare params only).
+  describe "changes made by requests without form params" do
+    let(:provider) { create(:provider, :with_cvr) }
+    let(:discount) { create(:discount, provider: provider, name_da: "Kaffe 20%") }
+
+    def archive_request(method)
+      Discount.where(id: discount.id).update_all(archived: true) # the server changed the row; the memoised object still says false
+      MagicTest::RequestRecord.new(at: 1.0, started_at: 0.5, method: method, path: "/udbydere/#{provider.id}/admin/rabatter/#{discount.id}/archive_now",
+        fullpath: "/udbydere/#{provider.id}/admin/rabatter/#{discount.id}/archive_now", status: 200, params: {}, templates: [],
+        db_changes: described_class.summarise([[:update, "discounts"]]).map(&:to_h), record_ids: [provider.id.to_s, discount.id.to_s], xhr: true, html: false)
+    end
+
+    def suggestions_for(method)
+      session = FakeSession.new(known_ids: [provider.id.to_s, discount.id.to_s], memoized: {provider: provider, discount: discount})
+      session.request_log.add(archive_request(method))
+      _steps, suggestions = session.build([ev("click", target: target(tag: "a", text: "Arkiver nu"), candidates: [cand(kind: "link_or_button", locator: "Arkiver nu")])])
+      suggestions.flat_map(&:lines)
+    end
+
+    it "suggests the changed attribute of the memoised record after a mutating GET (remote link)" do
+      expect(suggestions_for("GET")).to(include("expect(discount.reload.archived).to(eq(true))"))
+    end
+
+    it "suggests it after a POST without form params too, by diffing the memoised record" do
+      expect(suggestions_for("POST")).to(include("expect(discount.reload.archived).to(eq(true))"))
+    end
+
+    it "keeps suggesting it on every rebuild (the toolbar rebuilds from the events on each poll)" do
+      session = FakeSession.new(known_ids: [provider.id.to_s, discount.id.to_s], memoized: {provider: provider, discount: discount})
+      session.request_log.add(archive_request("GET"))
+      events = [ev("click", target: target(tag: "a", text: "Arkiver nu"), candidates: [cand(kind: "link_or_button", locator: "Arkiver nu")])]
+      3.times do
+        _steps, suggestions = session.build(events)
+        expect(suggestions.flat_map(&:lines)).to(include("expect(discount.reload.archived).to(eq(true))"))
+      end
+    end
   end
 end

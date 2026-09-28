@@ -11,17 +11,20 @@ require "magic_test/call_site"
 require "magic_test/console"
 require "magic_test/scripted_session"
 
+require "magic_test/record_refs"
+require "magic_test/hints"
+
 module MagicTest
   # One recording session: the server-side source of truth for events,
   # requests, generated steps and toolbar commands. `Session.run` blocks the
   # spec's main thread on the command queue until the toolbar (or a scripted
   # human) finishes the session.
   class Session
-    MAIN_THREAD_COMMANDS = %w[save save_and_finish finish replay_pending open_console abort].freeze
+    MAIN_THREAD_COMMANDS = %w[save save_and_finish finish replay_pending open_console abort front].freeze
 
     Command = Struct.new(:name, :params, :result_queue)
 
-    attr_reader :id, :call_site, :page, :event_log, :request_log, :status, :example, :messages, :writer, :context
+    attr_reader :id, :call_site, :page, :event_log, :request_log, :status, :example, :messages, :writer, :context, :saved_step_count
 
     def self.run(page:, call_site:, example: nil, context: nil)
       session = new(page: page, call_site: call_site, example: example, context: context)
@@ -107,6 +110,12 @@ module MagicTest
       ids.uniq
     end
 
+    # B7: let expressions for the memoised records' ids and values, as they
+    # were when each record was first seen (lazy lets join when they appear).
+    def record_refs
+      (@record_refs ||= RecordRefs.new).add(memoized)
+    end
+
     # The example's memoised `let` values (name => value), when RSpec is in use.
     def memoized
       return {} unless context.respond_to?(:__memoized, true)
@@ -164,6 +173,7 @@ module MagicTest
         "ignored_paths" => config.ignored_request_paths.map(&:source),
         "poll_interval_ms" => config.poll_interval_ms, "max_ancestor_depth" => config.max_ancestor_depth,
         "call_site" => call_site.to_h, "i18n_keys" => @i18n_keys, "mode" => @mode,
+        "hints" => Hints.payload("toolbar"),
         # A scripted human never looks at the panel, and it would cover page
         # elements a person would simply drag it away from.
         "toolbar" => ENV["MAGIC_TEST_SCRIPT"].blank? || ENV["MAGIC_TEST_TOOLBAR"].present?
@@ -311,6 +321,7 @@ module MagicTest
         finish!
         {ok: true}
       when "replay_pending" then replay_pending
+      when "front" then bring_to_front # B9: the wizard's status screen asks for the recording window
       when "open_console"
         opened = Console.open(binding)
         opened ? {ok: true, message: "console closed"} : {ok: false, error: "Pry is not available in this process"}
@@ -319,6 +330,15 @@ module MagicTest
       end
     rescue => e
       {ok: false, error: "#{e.class}: #{e.message}"}
+    end
+
+    # Ferrum 0.15 has no bring_to_front; activate the recording window's target over CDP.
+    def bring_to_front
+      browser = page.driver.browser
+      browser.command("Target.activateTarget", targetId: browser.page.target_id)
+      {ok: true}
+    rescue => e
+      {ok: false, error: "bring to front failed: #{e.message}"}
     end
 
     def finish!

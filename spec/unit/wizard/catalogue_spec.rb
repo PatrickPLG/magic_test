@@ -66,4 +66,25 @@ RSpec.describe(MagicTest::Wizard::Catalogue) do
     expect(catalogue.attribute_settable?("user", "password")).to(be(true))
     expect(catalogue.attribute_settable?("lead", "nope")).to(be(false))
   end
+
+  # 1.2 §4: pickers rank by what the specs use.
+  describe "learned ranking" do
+    it "puts the role's factory first, then the most used, and hides infrastructure factories" do
+      names = catalogue.ranked_factories("Provider").map(&:name)
+      expect(names.first).to(eq("provider"))
+      expect(names.index("discount")).to(be < names.index("lead"))
+      expect(catalogue.infrastructure_factory?("ahoy_visit")).to(be(true))
+      expect(catalogue.infrastructure_factory?("audit")).to(be(true))
+      expect(catalogue.infrastructure_factory?("flipper_feature")).to(be(true))
+      expect(catalogue.infrastructure_factory?("discount")).to(be(false))
+    end
+
+    it "puts a role's most visited start pages first" do
+      expect(catalogue.ranked_routes("Provider").first.name).to(eq("provider_admin_discounts"))
+      expect(catalogue.ranked_routes("Institution").map(&:name).first(3)).to(include("institution_events"))
+      expect(catalogue.ranked_routes(nil).first.name).to(eq("terms")) # guests visit the terms in the specs
+      expect(catalogue.default_traits("provider")).to(eq([["with_cvr"], catalogue.default_traits("provider").last]))
+      expect(catalogue.to_h[:learned][:factories]["provider"]).to(include(default_traits: ["with_cvr"], infrastructure: false))
+    end
+  end
 end

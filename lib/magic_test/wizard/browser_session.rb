@@ -1,3 +1,4 @@
+require "magic_test/hints"
 require "magic_test/wizard"
 require "json"
 
@@ -43,12 +44,13 @@ module MagicTest
           break if %w[recording cancelled].include?(@status)
         end
         raise Wizard::Error, "wizard cancelled" if @status == "cancelled"
-        wizard_window = page.windows.first if page.windows.size > 1
+        # B9: the wizard window stays open as a status screen (file, live step
+        # count, Save / Save & finish, "bring the recording to front"); the
+        # recording runs in the window the preflight opened.
         if @preflight_window
           page.switch_to_window(@preflight_window)
           front!
         end
-        wizard_window&.close if wizard_window && wizard_window != page.current_window
         runner.record(call_site, plan)
       ensure
         self.class.current = nil
@@ -60,19 +62,42 @@ module MagicTest
       def catalogue_payload
         catalogue.to_h.merge(suggested_path: Wizard.suggest_path(nil, ""), viewports: Plan::Extras::VIEWPORTS,
           defaults: {locale: I18n.default_locale.to_s, locales: I18n.available_locales.map(&:to_s), sidekiq: defined?(Sidekiq::Testing) ? true : false, flipper: defined?(Flipper) ? true : false},
-          target: ENV["MAGIC_TEST_WIZARD_TARGET"].presence, version: MagicTest::VERSION)
+          target: ENV["MAGIC_TEST_WIZARD_TARGET"].presence, version: MagicTest::VERSION,
+          starters: Starters.list(catalogue), templates: Templates.list(catalogue.root).map { |t| t.except("path") },
+          last_plan: runner.last_plan&.to_h, template_plan: runner.template_plan&.to_h, hints: MagicTest::Hints.payload("wizard"))
       end
 
-      # Validate + skeleton preview; never touches the browser.
+      # Validate + skeleton preview; never touches the browser. While the plan is
+      # still incomplete (no description or start page yet) the skeleton is
+      # drawn with TODO placeholders, so the pinned preview grows step by step.
+      INCOMPLETE_FIELDS = %w[description start.route target.path].freeze
+
       def preview(plan_hash)
         plan = Plan.from_h(plan_hash)
         validator = runner.validate(plan)
-        spec_file = runner.spec_file_for(plan)
+        spec_file = plan.target.path.to_s.empty? ? nil : runner.spec_file_for(plan)
         blocks = spec_file ? spec_file.all_blocks.map(&:to_h) : []
-        skeleton = validator.valid? ? runner.codegen_for(plan).skeleton : nil
-        {ok: validator.valid?, issues: validator.issues.map(&:to_h), plan: plan.to_h, skeleton: skeleton&.to_h, blocks: blocks, path: runner.path_for(plan), file_exists: !spec_file.nil?}
+        drawable = validator.errors.all? { |i| INCOMPLETE_FIELDS.include?(i.field) || i.field.start_with?("start.params") }
+        skeleton = drawable ? safe_skeleton(plan) : nil
+        {ok: validator.valid?, issues: validator.issues.map(&:to_h), plan: plan.to_h, skeleton: skeleton&.to_h, blocks: blocks,
+         path: plan.target.path.to_s.empty? ? nil : runner.path_for(plan), file_exists: !spec_file.nil?}
       rescue => e
         {ok: false, issues: [{severity: "error", field: "plan", message: "#{e.class}: #{e.message}", fix: nil}], plan: plan_hash}
+      end
+
+      def safe_skeleton(plan)
+        runner.codegen_for(plan).skeleton
+      rescue => e
+        MagicTest.logger.debug("magic_test wizard: no preview skeleton yet: #{e.message}")
+        nil
+      end
+
+      # "Save as template" (1.2 §5): spec/magic_test/templates/<name>.yml.
+      def save_template(plan_hash, name)
+        path = Templates.save(Plan.from_h(plan_hash), name, catalogue.root)
+        {ok: true, path: path, templates: Templates.list(catalogue.root).map { |t| t.except("path") }}
+      rescue => e
+        {ok: false, error: e.message}
       end
 
       def enqueue(name, params)
@@ -82,13 +107,26 @@ module MagicTest
           command.result_queue.pop(timeout: 120) || {ok: false, error: "#{name} timed out"}
         elsif name == "preview"
           preview(params["plan"] || {})
+        elsif name == "save_template"
+          save_template(params["plan"] || {}, params["name"].to_s)
         else
           {ok: false, error: "unknown command #{name}"}
         end
       end
 
       def state_payload
-        {status: @status, plan: plan&.to_h, preflight: last_preflight&.to_h, call_site: call_site&.to_h, errors: @errors}
+        {status: @status, plan: plan&.to_h, preflight: last_preflight&.to_h, call_site: call_site&.to_h, errors: @errors, recording: recording_payload}
+      end
+
+      # B9: what the status screen shows while the recorder runs (nil before Start).
+      def recording_payload
+        return nil unless @status == "recording"
+        session = MagicTest.session
+        return {status: "starting", steps: 0, saved: 0} unless session
+        steps = session.steps
+        {status: session.status.to_s, steps: steps.size, saved: session.saved_step_count, pending_code: session.pending_lines}
+      rescue => e
+        {status: "unknown", error: e.message}
       end
 
       private

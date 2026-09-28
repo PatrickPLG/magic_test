@@ -37,9 +37,15 @@ FactoryBot.define do
     end
   end
 
+  factory :zip_code do
+    sequence(:code) { |n| (2000 + n).to_s }
+    city { "København" }
+  end
+
   factory :provider do
     sequence(:name) { |n| "Café Vivaldi #{n}" }
     registration_number { nil }
+    zip_code
 
     after(:create) do |provider|
       create(:user, role: provider) && provider.reload unless provider.user
@@ -51,6 +57,10 @@ FactoryBot.define do
 
     trait :with_cvr do
       registration_number { "12345678" }
+    end
+
+    trait :with_english_company_description do
+      description_en { "Coffee and cake" }
     end
   end
 
@@ -198,7 +208,7 @@ FactoryBot.define do
   end
 
   factory :discount do
-    provider
+    association :provider, factory: [:provider, :with_cvr]
     sequence(:name_da) { |n| "Kaffe #{n * 10}%" }
     status { "active" }
 
@@ -228,9 +238,14 @@ FactoryBot.define do
   end
 
   factory :invoice do
-    provider
+    association :provider, factory: [:provider, :with_cvr]
     sequence(:number) { |n| "F-2026-#{n}" }
     amount_cents { 12_500 }
+  end
+
+  # No `invoice` here on purpose: the caller passes it (Studiz has such factories).
+  factory :payment do
+    amount_cents { 100 }
   end
 
   factory :lead do

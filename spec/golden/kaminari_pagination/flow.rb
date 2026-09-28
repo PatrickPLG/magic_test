@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("kaminari_pagination") do
   description "backoffice pages to the second page of leads and edits one"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:leads) { %w[Anders Bente Carl Dorte Erik].map { |n| create(:lead, name: n, email: "\#{n.downcase}@x.dk") } }
 
     before do

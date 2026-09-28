@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe('Provider sends a reminder and the js.erb response alerts', :js, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:discount) { create(:discount, provider: provider, name_da: 'Kaffe 20%') }
 
   before do

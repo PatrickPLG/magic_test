@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe('Backoffice pages to the second page of leads and edits one', :js, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:leads) { %w[Anders Bente Carl Dorte Erik].map { |n| create(:lead, name: n, email: "#{n.downcase}@x.dk") } }
 
   before do
@@ -11,7 +11,7 @@ RSpec.describe('Backoffice pages to the second page of leads and edits one', :js
   it 'backoffice pages to the second page of leads and edits one' do
     visit(backoffice_leads_path)
     click_on('2')
-    within('tr', text: 'Erik') do
+    within('tr', text: leads[4].name) do
       click_on(I18n.t('leads.index.edit'))
     end
     fill_in(I18n.t('activerecord.attributes.lead.name'), with: 'Erik Hansen')

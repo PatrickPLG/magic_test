@@ -39,6 +39,26 @@ module MagicTest
         self
       end
 
+      # Clicks the element's text: at `fraction` of its width (a label's text
+      # sits to the right of its checkbox), vertically centred.
+      def click_text(locator, fraction: 0.9, **options)
+        element = locator.is_a?(Capybara::Node::Element) ? locator : page.find(:css, locator, **options)
+        node_for(element)
+        x, y = page.evaluate_script("(function (el, f) { var r = el.getBoundingClientRect(); return [r.left + r.width * f, r.top + r.height / 2]; })(arguments[0], arguments[1])", element, fraction)
+        mouse.click(x: x, y: y)
+        self
+      end
+
+      # Clicks the row the element sits in: far to the right, inside the
+      # parent's box, at the element's height (where a person aims for "the row").
+      def click_row(locator, **options)
+        element = locator.is_a?(Capybara::Node::Element) ? locator : page.find(:css, locator, **options)
+        node_for(element)
+        x, y = page.evaluate_script("(function (el) { var r = el.getBoundingClientRect(), p = el.parentNode.getBoundingClientRect(); return [p.left + p.width * 0.9, r.top + r.height / 2]; })(arguments[0])", element)
+        mouse.click(x: x, y: y)
+        self
+      end
+
       def right_click(locator, **options)
         dodge_toolbar(node_for(locator, **options)).click(mode: :right)
         self

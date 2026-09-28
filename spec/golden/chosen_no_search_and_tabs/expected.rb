@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe('Provider sets the status with the search-less chosen select and uses the description', :js, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:discount) { create(:discount, provider: provider, name_da: 'Kaffe 20%', status: 'draft') }
 
   before do

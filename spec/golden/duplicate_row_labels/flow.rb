@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("duplicate_row_labels") do
   description "backoffice edits the second lead in a table where every row says Rediger"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:leads) { %w[Anders Bente Carl].map { |n| create(:lead, name: n, email: "\#{n.downcase}@x.dk") } }
 
     before do

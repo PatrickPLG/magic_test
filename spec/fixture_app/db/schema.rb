@@ -24,9 +24,24 @@ ActiveRecord::Schema[7.0].define(version: 2026_09_24_000001) do
     t.timestamps
   end
 
+  create_table "payments", force: :cascade do |t|
+    t.integer "invoice_id", null: false
+    t.integer "amount_cents", default: 0
+    t.timestamps
+  end
+
+  create_table "zip_codes", force: :cascade do |t|
+    t.string "code", null: false
+    t.string "city"
+    t.timestamps
+  end
+
   create_table "providers", force: :cascade do |t|
     t.string "name"
     t.string "registration_number"
+    t.text "description_en"
+    t.integer "zip_code_id", null: false
+    t.integer "group_leader_id"
     t.timestamps
   end
 

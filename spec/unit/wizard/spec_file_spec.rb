@@ -1,5 +1,6 @@
 require "rails_helper"
 require "magic_test/wizard"
+require "digest"
 
 RSpec.describe(MagicTest::Wizard::SpecFile) do
   def fixture(name)
@@ -53,5 +54,49 @@ RSpec.describe(MagicTest::Wizard::SpecFile) do
     content = file.content_with(ctx, ["it 'x' do", "end"])
     expect(content.lines[ctx.last_line - 1..ctx.last_line + 2].join).to(eq("\n    it 'x' do\n    end\n  end\n"))
     RubyVM::InstructionSequence.compile(content)
+  end
+
+  # B4 (1.2): Studiz files nest describe/context with repeated names, so a
+  # block is picked from the parsed tree and referenced exactly (full path,
+  # header hash, line); a tail match on descriptions took the first hit.
+  describe "block references" do
+    let(:file) { described_class.parse(fixture("nested_duplicates_spec.rb")) }
+
+    def header(line)
+      Digest::SHA1.hexdigest(line)[0, 12]
+    end
+
+    it "labels every block with kind, description and line, and gives it an exact reference" do
+      visuals = file.all_blocks.select { |b| b.description == "Visuals" }
+      expect(visuals.map(&:label)).to(eq(["context 'Visuals' (line 15)", "context 'Visuals' (line 34)"]))
+      expect(visuals.first.ref).to(eq({"path" => ["Provider Discounts Page", "index page", "Visuals"], "line" => 15, "header" => header("context 'Visuals' do")}))
+      expect(visuals.first.to_h[:ref]).to(eq(visuals.first.ref))
+      expect(visuals.first.to_h[:label]).to(eq("context 'Visuals' (line 15)"))
+    end
+
+    it "rejects a description that matches several blocks instead of taking the first" do
+      expect { file.find_block(["Visuals"]) }.to(raise_error(
+        MagicTest::Wizard::AmbiguousBlock,
+        "\"Visuals\" matches 2 blocks in #{file.path}: context 'Visuals' (line 15), context 'Visuals' (line 34). Pick one by its line."
+      ))
+    end
+
+    it "finds a block by its full path even when its line and header have changed" do
+      ref = {"path" => ["Provider Discounts Page", "edit page", "Visuals"], "line" => 999, "header" => "stale"}
+      expect(file.find_block(ref).first_line).to(eq(34))
+    end
+
+    it "uses the header, then the line, to tell apart blocks with the same full path" do
+      path = ["Provider Discounts Page", "edit page", "Form operations"]
+      expect(file.find_block({"path" => path, "line" => 1, "header" => header("context 'Form operations', :slow do")}).first_line).to(eq(41))
+      expect(file.find_block({"path" => path, "line" => 50, "header" => nil}).first_line).to(eq(50))
+      expect { file.find_block({"path" => path, "line" => 1, "header" => "nope"}) }.to(raise_error(MagicTest::Wizard::AmbiguousBlock, /"Form operations" matches 2 blocks .*\(line 41\), .*\(line 50\)/))
+    end
+
+    it "returns nil for a path that is not in the file, and the outermost block for no reference" do
+      expect(file.find_block({"path" => ["Provider Discounts Page", "nope"], "line" => 1, "header" => nil})).to(be_nil)
+      expect(file.find_block(["nope"])).to(be_nil)
+      expect(file.find_block(nil).first_line).to(eq(4))
+    end
   end
 end

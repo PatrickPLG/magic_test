@@ -1,0 +1,10 @@
+.modal-header
+  %h5.modal-title= @discount.name_da
+  %button.btn-close{"aria-label" => "Close", "data-bs-dismiss" => "modal", type: "button"}
+.modal-body
+  %p= @discount.description.presence || t("discounts.show.no_description")
+  %p
+    = link_to @discount.name_da, edit_provider_admin_discount_path(@provider, @discount), class: "discount-name-link"
+.modal-footer
+  = link_to t("discounts.show.archive_now"), archive_now_provider_admin_discount_path(@provider, @discount), remote: true, class: "btn btn-outline-danger archive-now"
+  = link_to t("discounts.index.archive"), archive_provider_admin_discount_path(@provider, @discount), remote: true, data: {"bs-toggle": "modal", "bs-target": "#ajax-modal"}, class: "btn btn-outline-secondary"

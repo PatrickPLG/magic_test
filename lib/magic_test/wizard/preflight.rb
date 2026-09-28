@@ -19,14 +19,22 @@ module MagicTest
         end
       end
 
-      Result = Struct.new(:ok, :failures, :status, :url, :path, :expected_path, :title, :js_errors, :screenshot, :records, :user, :notes) do
+      # B2: something RSpec would accept but the person should know about
+      # (a record that saved but is invalid afterwards). Never blocks.
+      Warning = Failure
+
+      Result = Struct.new(:ok, :failures, :status, :url, :path, :expected_path, :title, :js_errors, :screenshot, :records, :user, :notes, :warnings) do
         def to_h
           {ok: ok, failures: failures.map(&:to_h), status: status, url: url, path: path, expected_path: expected_path, title: title,
-           js_errors: js_errors, screenshot: screenshot, records: records, user: user, notes: notes}
+           js_errors: js_errors, screenshot: screenshot, records: records, user: user, notes: notes, warnings: warnings.map(&:to_h)}
         end
 
         def summary
-          return "preflight passed: #{status} #{path} (#{records.size} record(s), signed in as #{user || "guest"})" if ok
+          if ok
+            lines = ["preflight passed: #{status} #{path} (#{records.size} record(s), signed in as #{user || "guest"})"]
+            lines.concat(warnings.map { |w| "preflight warning at #{w.stage}: #{w}" })
+            return lines.join("\n")
+          end
           failures.map { |f| "preflight failed at #{f.stage}: #{f}" }.join("\n")
         end
       end
@@ -48,15 +56,16 @@ module MagicTest
         reset_state!
         failures = []
         notes = []
+        warnings = []
         evaluate_existing_lets(failures)
         evaluate_plan_lets(failures) if failures.empty?
-        check_records(failures) if failures.empty?
+        check_records(failures, warnings) if failures.empty?
         user = failures.empty? ? resolve_user(failures) : nil
         run_setup(failures, user) if failures.empty?
         page_info = failures.empty? ? visit(failures, notes, new_window: new_window) : {}
         install_memoized! if failures.empty?
         Result.new(failures.empty?, failures, page_info[:status], page_info[:url], page_info[:path], page_info[:expected_path], page_info[:title],
-          page_info[:js_errors] || [], page_info[:screenshot], record_summary, user && describe_user(user), notes)
+          page_info[:js_errors] || [], page_info[:screenshot], record_summary, user && describe_user(user), notes, warnings)
       end
 
       # Clean slate between attempts: data, time, memoised values, session.
@@ -119,7 +128,10 @@ module MagicTest
         false
       end
 
-      def check_records(failures)
+      # Fails only where RSpec would (create raised, or build without save). A
+      # record that saved but is invalid afterwards (Studiz's provider
+      # :with_cvr) is a warning: the spec's `let!` succeeded exactly like this.
+      def check_records(failures, warnings)
         records.each do |name, value|
           Array(value).each do |record|
             next unless record.respond_to?(:persisted?)
@@ -128,10 +140,25 @@ module MagicTest
               next
             end
             if record.respond_to?(:valid?) && !record.valid?
-              failures << Failure.new("records", "let!(:#{name}) is persisted but invalid: #{errors_of(record)}.", "set the attribute in the overrides or use another trait", "models.#{name}")
+              warnings << Warning.new("records", "let!(:#{name}) is persisted but would not pass validation if re-saved: #{errors_of(record)}.", revalidation_fix(name, record), "models.#{name}")
             end
           end
         end
+      end
+
+      def revalidation_fix(name, record)
+        fix = "RSpec accepts this (create succeeded); it only matters if the test saves #{name} again"
+        traits = traits_for_attributes(name, record.errors.attribute_names.map(&:to_s))
+        traits.any? ? "#{fix}. Traits that mention those attributes: #{traits.map { |t| ":#{t}" }.join(", ")}" : fix
+      end
+
+      # Traits of the let's factory whose names share a word with the invalid attributes.
+      def traits_for_attributes(name, attributes)
+        model = plan.models.find { |m| m.let.to_s == name.to_s }
+        factory = model && catalogue.factories.find { |f| f.name.to_s == model.factory.to_s }
+        return [] unless factory
+        words = attributes.flat_map { |a| a.split("_") }.reject { |w| w.size < 3 }.uniq
+        factory.traits.map { |t| t.respond_to?(:name) ? t.name.to_s : t.to_s }.select { |t| words.any? { |w| t.include?(w) } } - Array(model.traits).map(&:to_s)
       end
 
       def errors_of(record)
@@ -213,6 +240,7 @@ module MagicTest
         end
         context.visit(expected)
         page = context.page
+        wait_for_page(page, expected)
         status = begin
           page.status_code
         rescue NotImplementedError, NoMethodError
@@ -249,6 +277,25 @@ module MagicTest
         raise e if e.is_a?(SystemExit) || e.is_a?(Interrupt)
         failures << classify(e, "visit", "start.route", expr)
         {}
+      end
+
+      # A window Chrome has just opened can finish the navigation before Ferrum
+      # knows the frame's new JavaScript context (seen in CI under load); Ferrum
+      # itself retries for only 0.6 s and every read of the page then raises
+      # "There's no context available". Wait for the context the Capybara way,
+      # and if it never arrives load the page once more, as a person would.
+      def wait_for_page(page, expected)
+        return unless defined?(Ferrum::NoExecutionContextError)
+        reloaded = false
+        loop do
+          page.document.synchronize(Capybara.default_max_wait_time, errors: [Ferrum::NoExecutionContextError]) { page.evaluate_script("document.readyState") }
+          return
+        rescue Ferrum::NoExecutionContextError
+          raise if reloaded
+          reloaded = true
+          MagicTest.logger.warn("magic_test wizard: #{expected} had no JavaScript context after the visit; loading it again")
+          context.visit(expected)
+        end
       end
 
       # ":institution_id is provider, a Provider" when a param's name and the let's class disagree.

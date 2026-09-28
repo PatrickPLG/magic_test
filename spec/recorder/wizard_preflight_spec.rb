@@ -7,7 +7,10 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   let(:root) { Rails.root.join("tmp/wizard_preflight") }
   let(:runner) { MagicTest::Wizard::Runner.new(self) }
 
-  before { FileUtils.rm_rf(root) }
+  before do
+    studiz_driven_by
+    FileUtils.rm_rf(root)
+  end
 
   def plan(h)
     base = {"description" => "x", "target" => {"path" => root.join("spec/system/x_spec.rb").to_s}}
@@ -31,6 +34,23 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
     expect(File.exist?(root.join("spec/system/x_spec.rb"))).to(be(false))
   end
 
+  # B2 (1.2): Studiz's `create(:provider, :with_cvr)` saves, but `valid?` is
+  # false afterwards ("Company description en Must have english description").
+  # RSpec accepts that; preflight must too, with a warning instead of a block.
+  it "passes a record that saved but is invalid afterwards, with a warning" do
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
+      "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
+    expect(result.failures).to(be_empty)
+    expect(result.ok).to(be(true))
+    expect(result.status).to(eq(200))
+    w = result.warnings.first
+    expect(w.stage).to(eq("records"))
+    expect(w.message).to(eq("let!(:provider) is persisted but would not pass validation if re-saved: Description en Must have english description."))
+    expect(w.fix).to(include("RSpec accepts this", ":with_english_company_description"))
+    expect(result.summary).to(include("preflight passed: 200 /udbydere/", "preflight warning at records: let!(:provider) is persisted but would not pass validation"))
+    expect(result.to_h[:warnings].first[:message]).to(eq(w.message))
+  end
+
   it "reports an invalid record with the validation errors and a fix" do
     result = preflight(plan("signed_in" => "company", "models" => [{"let" => "company", "factory" => "company", "attributes" => {"cvr" => ""}}],
       "start" => {"route" => "company_dashboard"}))
@@ -42,7 +62,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "reports a 403 when the signed-in role does not own the record" do
-    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider"}, {"let" => "other_provider", "factory" => "provider"}],
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}, {"let" => "other_provider", "factory" => "provider", "traits" => ["with_cvr"]}],
       "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "other_provider"}}))
     expect(result.ok).to(be(false))
     f = result.failures.first
@@ -53,7 +73,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "reports a route param that points at the wrong let" do
-    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider"}],
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
       "start" => {"route" => "institution_students", "params" => {"institution_id" => "provider"}}))
     expect(result.ok).to(be(false))
     f = result.failures.first
@@ -63,7 +83,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "reports a guest redirected to the login page" do
-    result = preflight(plan("models" => [{"let" => "provider", "factory" => "provider"}],
+    result = preflight(plan("models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
       "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
     expect(result.ok).to(be(false))
     f = result.failures.first
@@ -73,7 +93,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "passes, keeps the records, signs in and lands on the page with a screenshot" do
-    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider"}, {"let" => "discount", "factory" => "discount"}],
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}, {"let" => "discount", "factory" => "discount"}],
       "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
     expect(result.ok).to(be(true), result.summary)
     expect(result.status).to(eq(200))
@@ -88,6 +108,29 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
     p = plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_gold"]}], "start" => {"route" => "root"})
     v = runner.validate(p)
     expect(v.errors.first.message).to(eq("Factory :provider has no trait :with_gold."))
-    expect(v.errors.first.fix).to(eq("known traits: :with_cvr, :with_user"))
+    expect(v.errors.first.fix).to(eq("known traits: :with_cvr, :with_english_company_description, :with_user"))
+  end
+
+  # Seen in the Studiz-mirror CI job under load: right after the visit, the
+  # freshly opened window's frame had no JavaScript context yet, Ferrum gave
+  # up after 0.6 s, and preflight reported "Ferrum::NoExecutionContextError:
+  # There's no context available" as a failure of the start page.
+  it "waits for the start page's JavaScript context instead of reporting a visit failure" do
+    armed = 0
+    allow(page.driver).to(receive(:visit).and_wrap_original do |m, *args|
+      result = m.call(*args)
+      armed = 12 # twice Ferrum's own attempts
+      result
+    end)
+    allow_any_instance_of(Ferrum::Frame).to(receive(:execution_id!).and_wrap_original do |m, *args|
+      raise Ferrum::NoExecutionContextError if (armed -= 1) >= 0
+      m.call(*args)
+    end)
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
+      "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
+    expect(result.failures.map(&:message)).to(eq([]))
+    expect(result.status).to(eq(200))
+    expect(result.path).to(start_with("/udbydere/"))
+    expect(result.title).not_to(be_empty)
   end
 end

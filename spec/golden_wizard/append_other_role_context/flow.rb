@@ -11,6 +11,7 @@ MagicTest::Testing::WizardFlow.define("append_other_role_context") do
     models:
       - let: provider
         factory: provider
+        traits: [with_cvr]
       - let: discount
         factory: discount
         traits: [active]

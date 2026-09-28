@@ -109,7 +109,8 @@ module MagicTest
       end
 
       def it_lines
-        inner = ["visit(#{start_expression})", "magic_test"]
+        visit = plan.start.route.to_s.empty? ? "visit('/') # TODO: pick the start page (step 3)" : "visit(#{start_expression})"
+        inner = [visit, "magic_test"]
         if plan.extras.sidekiq_inline
           ["Sidekiq::Testing.inline! do"] + inner.map { |l| "  #{l}" } + ["end"]
         else
@@ -127,9 +128,16 @@ module MagicTest
         args.empty? ? helper : "#{helper}(#{args.join(", ")})"
       end
 
+      def block_name
+        ref = plan.target.block
+        ref.is_a?(Hash) ? Array(ref["path"]).join(" > ") : Array(ref).join(" > ")
+      end
+
       # :new_file, :append_it (everything already there) or :new_context.
       def mode
-        return :new_file unless spec_file && block
+        return :new_file unless spec_file
+        # B3: an existing file is never rewritten as a new file.
+        raise Wizard::Error, "block not found in #{spec_file.path}: #{block_name.presence || "(no describe block)"}. Blocks in the file: #{spec_file.blocks_summary}" unless block
         return :append_it if let_lines.empty? && setup_lines.empty?
         :new_context
       end
@@ -163,7 +171,7 @@ module MagicTest
 
       # The `it` block as unindented lines.
       def example_lines
-        ["it #{RubyLiteral.string(plan.description)} do"] + indent(it_lines) + ["end"]
+        ["it #{RubyLiteral.string(plan.description.to_s.strip.empty? ? "TODO: describe the test" : plan.description)} do"] + indent(it_lines) + ["end"]
       end
 
       def before_block
@@ -172,7 +180,8 @@ module MagicTest
       end
 
       def new_file_source
-        lines = ["require 'rails_helper'", "", "# #{plan.description}", "RSpec.describe(#{RubyLiteral.string(plan.description.sub(/\A[a-z]/, &:upcase))}, :js, type: :system) do"]
+        title = plan.description.to_s.strip.empty? ? "TODO: describe the test" : plan.description
+        lines = ["require 'rails_helper'", "", "# #{title}", "RSpec.describe(#{RubyLiteral.string(title.sub(/\A[a-z]/, &:upcase))}, :js, type: :system) do"]
         lines += indent(let_lines)
         lines << "" if let_lines.any?
         lines += indent(before_block)

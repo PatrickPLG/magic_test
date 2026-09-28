@@ -6,6 +6,9 @@ require "rails_helper"
 require "magic_test/wizard/runner"
 
 RSpec.describe("magic_test wizard", :js, type: :system) do
+  # B1: the host may register no default driver (Studiz sets it per spec).
+  before { MagicTest::Wizard.apply_driver!(self) }
+
   it "creates a new system test" do
     MagicTest::Wizard::Runner.run(self)
   end

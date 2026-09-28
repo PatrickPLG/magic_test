@@ -25,6 +25,7 @@ Rails.application.routes.draw do
             post :send_reminder
             get :archive
             post :confirm_archive
+            get :archive_now
           end
         end
       end

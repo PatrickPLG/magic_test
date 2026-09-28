@@ -14,14 +14,26 @@ require "rspec-sidekiq"
 RSpec::Sidekiq.configure { |c| c.warn_when_jobs_not_processed_by_sidekiq = false }
 require "magic_test/testing/scripted_human"
 
-# Fresh schema on every boot: the fixture app has no migrations.
+# Fresh schema on every boot: the fixture app has no migrations. On Postgres
+# each run has its own database (FIXTURE_APP_DB name), created here if missing.
+begin
+  ActiveRecord::Base.connection
+rescue ActiveRecord::NoDatabaseError
+  ActiveRecord::Tasks::DatabaseTasks.create_current
+  ActiveRecord::Base.establish_connection
+end
 ActiveRecord::Schema.verbose = false
 load Rails.root.join("db/schema.rb")
 
 Dir[File.expand_path("support/**/*.rb", __dir__)].sort.each { |f| require f }
 
-Capybara.default_driver = :cuprite # every system spec runs JS, like Studiz
-Capybara.javascript_driver = :cuprite
+# FIXTURE_STUDIZ_MIRROR=1 mirrors Studiz exactly: no global driver, every spec
+# calls `driven_by :cuprite` in its own before (the wizard specs run under both).
+STUDIZ_MIRROR = ENV["FIXTURE_STUDIZ_MIRROR"].present?
+unless STUDIZ_MIRROR
+  Capybara.default_driver = :cuprite # every system spec runs JS, like Studiz
+  Capybara.javascript_driver = :cuprite
+end
 Capybara.server = :puma, {Silent: true}
 Capybara.default_max_wait_time = ENV["CI"] ? 10 : 5
 Capybara.disable_animation = true
@@ -71,6 +83,6 @@ RSpec.configure do |config|
     # NOTE: rspec-rails' `driven_by` RE-REGISTERS the :cuprite driver with Rails
     # defaults (ActionDispatch::SystemTesting::Driver#register), so the options
     # must be passed here to take effect. See docs/DECISIONS.md.
-    driven_by :cuprite, screen_size: [1200, 800], options: FixtureAppSupport::CUPRITE_OPTIONS.dup
+    driven_by :cuprite, screen_size: [1200, 800], options: FixtureAppSupport::CUPRITE_OPTIONS.dup unless STUDIZ_MIRROR
   end
 end

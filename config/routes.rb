@@ -10,5 +10,5 @@ MagicTest::Engine.routes.draw do
   get "wizard.js", to: "wizard#script"
   get "wizard/catalogue", to: "wizard#catalogue"
   get "wizard/state", to: "wizard#state"
-  post "wizard/:name", to: "wizard#command", constraints: {name: /preview|preflight|start|cancel/}
+  post "wizard/:name", to: "wizard#command", constraints: {name: /preview|preflight|start|cancel|save_template/}
 end

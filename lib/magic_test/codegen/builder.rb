@@ -104,7 +104,8 @@ module MagicTest
         index, locale = i18n_for(event)
         LocatorPicker.new(known_ids: @session.known_ids, i18n_index: index, i18n_locale: locale,
           i18n_keys: @session.i18n_keys?, template_scopes: scopes,
-          namespace: scopes.first&.split(".")&.first)
+          namespace: scopes.first&.split(".")&.first,
+          record_refs: (@session.respond_to?(:record_refs) ? @session.record_refs : nil))
       end
 
       def override_for(event_ids)
@@ -146,8 +147,8 @@ module MagicTest
             index = s["index"].to_i
             chain << Scope.new(kind: :within, open: "within(all(#{RubyLiteral.string(s["css"])}, minimum: #{index + 1})[#{index}]) do", key: "within:#{s["css"]}[#{index}]")
           else
-            args = [RubyLiteral.string(s["css"])]
-            args << "text: #{RubyLiteral.string(s["text"])}" if s["text"].present?
+            args = [s["css_code"] || RubyLiteral.string(s["css"])]
+            args << "text: #{s["text_code"] || RubyLiteral.string(s["text"])}" if s["text"].present?
             chain << Scope.new(kind: :within, open: "within(#{args.join(", ")}) do", key: "within:#{s["css"]}:#{s["text"]}")
           end
         end
@@ -260,8 +261,10 @@ module MagicTest
         RubyLiteral.string(address)
       end
 
+      # B8: any request that changed rows counts, GET included (a rails-ujs
+      # remote link is a GET; Studiz's archive confirm is one).
       def db_suggestions(event)
-        record = @session.request_log.all.reverse.find { |r| !r.get? && r.db_changes.present? }
+        record = @session.request_log.all.reverse.find { |r| r.db_changes.present? }
         return unless record && !@suggested_db_for&.include?(record.id)
         (@suggested_db_for ||= []) << record.id
         record.db_changes.each do |change|
@@ -287,19 +290,37 @@ module MagicTest
         end
       end
 
+      # Reload assertions for the memoised record the request changed: every
+      # attribute whose stored value differs from what the example last saw
+      # (B8: a remote link sends no form params, so the diff is the evidence),
+      # plus the form params that now match.
       def reload_suggestions(record, model, event)
         klass = model.constantize
         param_key = klass.model_name.param_key
         attrs = record.params && (record.params[param_key] || record.params[param_key.to_s])
-        return unless attrs.is_a?(Hash)
-        var, rec = @session.memoized.find { |_n, v| v.is_a?(klass) && (record.record_ids || []).include?(v.id.to_s) }
+        attrs = {} unless attrs.is_a?(Hash)
+        # The record in the request path first (PATCH /udbydere/1/admin/rabatter/2: the
+        # member id is the last one, the earlier ones belong to parents); ids in
+        # the params are weaker evidence; a lone let of the class is the last resort.
+        path_ids = record.respond_to?(:path) ? record.path.to_s.scan(%r{/(\d+)(?=/|\z)}).flatten.reverse : []
+        seen = @session.memoized.select { |_n, v| v.is_a?(klass) && (record.record_ids || []).include?(v.id.to_s) }
+        var, rec = path_ids.lazy.map { |id| seen.find { |_n, v| v.id.to_s == id } }.find(&:itself) || ((seen.size == 1) ? seen.first : nil)
         if var.nil?
           # Singular resources (`/profil`) carry no id: the only let of that class is the record.
           same_class = @session.memoized.select { |_n, v| v.is_a?(klass) }
           var, rec = same_class.first if same_class.size == 1
         end
         return unless var
+        # Baseline: the values the example started with (RecordRefs snapshots
+        # them when a record is first seen). Every build rebuilds from the
+        # events, so a baseline read from the in-memory record would move after
+        # the first reload and the suggestion would vanish on the next poll.
+        before = (@session.respond_to?(:record_refs) && @session.record_refs.attributes_for(var.to_s)) || (rec.respond_to?(:attributes) ? rec.attributes.dup : {})
         rec.reload
+        changed = rec.attributes.reject { |k, v| before[k] == v || %w[updated_at created_at lock_version].include?(k) || v.nil? }
+        changed.each do |attr, current|
+          suggest(:db_attr, Assertions.reload_attr(var, attr, RubyLiteral.value(current)), "Assert #{var}.#{attr}", event)
+        end
         attrs.each do |attr, value|
           next unless rec.respond_to?(attr) && value.is_a?(String)
           current = rec.public_send(attr)

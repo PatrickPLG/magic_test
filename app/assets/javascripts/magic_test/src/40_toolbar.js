@@ -36,7 +36,14 @@ MT.toolbar = (function () {
     '.dialog .btns { display: flex; gap: 8px; justify-content: flex-end; } .dialog button { font: inherit; padding: 4px 12px; border-radius: 4px; border: 1px solid #9aa3af; background: #f3f4f6; cursor: pointer; } .dialog button.accept { background: #2563eb; color: #fff; border-color: #1d4ed8; }',
     'select.alt { font: inherit; font-size: 11px; max-width: 200px; }',
     '.empty { color: #6b7280; padding: 10px 0; }',
-    '.kbd { font: 10px ui-monospace, monospace; background: #e5e7eb; border-radius: 3px; padding: 0 4px; color: #374151; }'
+    '.kbd { font: 10px ui-monospace, monospace; background: #e5e7eb; border-radius: 3px; padding: 0 4px; color: #374151; }',
+    'button.hint { width: 15px; height: 15px; padding: 0; line-height: 13px; border-radius: 50%; font-size: 10px; border: 1px solid #9aa3af; background: #fff; color: #374151; cursor: pointer; vertical-align: middle; }',
+    'button.hint:hover, button.hint:focus { background: #2563eb; color: #fff; border-color: #2563eb; outline: none; }',
+    '.badge { cursor: pointer; border: 0; padding: 0; }',
+    '.popover { position: fixed; z-index: 2147483002; max-width: 380px; background: #111827; color: #e5e7eb; border-radius: 6px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }',
+    '.popover .when { color: #9ca3af; margin-top: 4px; }',
+    '.popover pre { margin: 6px 0 0; font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0f172a; padding: 6px; border-radius: 4px; white-space: pre-wrap; color: #e2e8f0; }',
+    '.popover h5 { margin: 0 0 4px; font-size: 12px; } .popover ul { margin: 4px 0 0; padding-left: 16px; } .popover li { margin: 2px 0; } .popover .why { color: #9ca3af; }'
   ].join('\n');
 
   function h(tag, attrs, children) {
@@ -50,6 +57,66 @@ MT.toolbar = (function () {
     });
     (children || []).forEach(function (c) { if (c) el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
     return el;
+  }
+
+  // ---- "?" hints (1.2 §6) from config/hints.yml (MT.config.hints), one popover at a time.
+  var popover = null;
+  function hintData(key) { return ((MT.config && MT.config.hints) || {})[key]; }
+  function closePopover() { if (popover) { popover.node.remove(); popover.anchor.removeAttribute('aria-describedby'); popover = null; } }
+  function openPopover(anchor, children) {
+    closePopover();
+    var id = 'mt-hint-' + Math.random().toString(36).slice(2, 8);
+    var node = h('div', { class: 'popover', role: 'tooltip', id: id }, children);
+    root.appendChild(node);
+    var r = anchor.getBoundingClientRect();
+    var left = Math.max(6, Math.min(r.left, window.innerWidth - 400));
+    var top = r.bottom + 6;
+    node.style.left = left + 'px';
+    node.style.top = top + 'px';
+    if (top + node.offsetHeight > window.innerHeight) node.style.top = Math.max(6, r.top - node.offsetHeight - 6) + 'px';
+    anchor.setAttribute('aria-describedby', id);
+    popover = { node: node, anchor: anchor };
+  }
+  function hintChildren(key) {
+    var d = hintData(key);
+    if (!d) return [h('div', { text: 'No hint for ' + key })];
+    return [h('div', { text: d.text }), d.when ? h('div', { class: 'when', text: 'When: ' + d.when }) : null, d.example ? h('pre', { text: String(d.example).replace(/\s+$/, '') }) : null];
+  }
+  // The "?" button for a hint key such as 'have_content' (toolbar section).
+  function hint(key, label) {
+    var btn = h('button', { type: 'button', class: 'hint', 'data-hint': 'toolbar.' + key, 'aria-label': label || ('What is ' + key.replace(/_/g, ' ') + '?'), text: '?' });
+    btn.addEventListener('mouseenter', function () { openPopover(btn, hintChildren(key)); });
+    btn.addEventListener('focus', function () { openPopover(btn, hintChildren(key)); });
+    btn.addEventListener('mouseleave', function () { if (root.activeElement !== btn) closePopover(); });
+    btn.addEventListener('blur', closePopover);
+    btn.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); if (popover && popover.anchor === btn) closePopover(); else openPopover(btn, hintChildren(key)); });
+    return btn;
+  }
+  var ASSERTION_HINTS = { '': 'have_css', css: 'have_css', no_css: 'have_no_css', field: 'have_field', checked: 'have_checked_field', unchecked: 'have_checked_field', select: 'have_select', button: 'have_button', link: 'have_link', count: 'have_css' };
+  var SUGGESTION_HINTS = { flash: 'have_content', toast: 'toast', modal_closed: 'modal_closed', db_count: 'change_count', db_attr: 'reload_attr', path: 'have_current_path', mail: 'have_content', job: 'change_count', content: 'have_content', no_content: 'have_no_content' };
+  function suggestionHintKey(s) {
+    if (SUGGESTION_HINTS[s.kind]) return SUGGESTION_HINTS[s.kind];
+    var m = /have_(no_content|content|css|no_css|field|checked_field|unchecked_field|select|button|link|current_path)/.exec(s.code || '');
+    return m ? (m[1] === 'unchecked_field' ? 'have_checked_field' : 'have_' + m[1]) : 'have_content';
+  }
+  // "Why this locator?": the chosen code and every alternative with the reason it lost.
+  function whyLost(step, c) {
+    var cand = c.candidate || {};
+    if (cand.kind === 'positional') return 'positional selectors are the last resort';
+    if (cand.scope) return 'needs a within(' + cand.scope.css + ') scope; a global locator ranks higher';
+    if (cand.kind === 'css') return 'CSS ranks below labels, text, ids and names';
+    if (cand.by === 'own_text' || cand.by === 'text') return 'text ranks below a label; several texts tie by order';
+    return 'ranks lower than the chosen ' + (step.locator ? 'text' : 'locator');
+  }
+  function whyLocator(step) {
+    var alts = (step.candidates || []).filter(function (c) { return c.code !== step.code; });
+    return [
+      h('h5', { text: 'Why this locator?' }),
+      h('div', { class: 'code', text: step.code || '' }),
+      h('div', { class: 'why', text: step.confidence === 'green' ? 'A verified unique semantic locator (label, text, id or name): the recorder\'s first choice.' : (step.confidence === 'amber' ? 'Unique only inside a scope, or a CSS selector: fine, but a stable id or text would be better.' : 'Not unique or not stable: review it before saving.') }),
+      alts.length ? h('ul', {}, alts.slice(0, 6).map(function (c) { return h('li', {}, [h('span', { class: 'code', text: c.code }), h('div', { class: 'why', text: c.label + ' — ' + whyLost(step, c) })]); })) : h('div', { class: 'why', text: 'No other unique candidate.' }),
+      h('div', { class: 'when', text: hintData('why_locator') ? hintData('why_locator').text : '' })
+    ];
   }
 
   function mount() {
@@ -76,12 +143,17 @@ MT.toolbar = (function () {
       opt('', 'auto'), opt('css', 'have_css'), opt('no_css', 'have_no_css'), opt('field', 'have_field'), opt('checked', 'have_checked_field'), opt('unchecked', 'have_unchecked_field'),
       opt('select', 'have_select'), opt('button', 'have_button'), opt('link', 'have_link'), opt('count', 'count in list/table')
     ]);
+    els.assertHint = hint(ASSERTION_HINTS[''], 'What does this assertion check?');
+    els.assertHint.setAttribute('data-hint-for', 'assertion-type');
+    els.assertType.addEventListener('change', function () { els.assertHint.setAttribute('data-hint', 'toolbar.' + ASSERTION_HINTS[els.assertType.value]); });
+    els.assertHint.addEventListener('mouseenter', function () { openPopover(els.assertHint, hintChildren(ASSERTION_HINTS[els.assertType.value] || 'have_css')); });
+    els.assertHint.addEventListener('focus', function () { openPopover(els.assertHint, hintChildren(ASSERTION_HINTS[els.assertType.value] || 'have_css')); });
     els.selectionBtn = h('button', { text: 'Assert selection', title: 'Alt+Shift+X: highlighted text → have_content', onclick: function () { MT.assert.fromSelection(false); } });
     els.noSelectionBtn = h('button', { text: 'Assert absent', title: 'have_no_content for the highlighted text', onclick: function () { MT.assert.fromSelection(true); } });
     els.pathBtn = h('button', { text: 'Assert path', onclick: function () { MT.assert.currentPath(); } });
     els.hoverBtn = h('button', { text: 'Hover next', title: 'Record a hover on the next element you click (or Alt+Shift+H with the mouse over it)', onclick: function () { MT.modes.set(MT.modes.current() === 'hover' ? 'record' : 'hover'); render(); } });
     els.i18nBtn = h('button', { text: 'I18n keys', title: 'Toggle I18n.t(...) vs literal text', onclick: function () { MT.transport.command('toggle_i18n').then(render); } });
-    var bar = h('div', { class: 'bar' }, [els.recordBtn, els.assertBtn, els.assertType, els.selectionBtn, els.noSelectionBtn, els.pathBtn, els.hoverBtn, els.i18nBtn]);
+    var bar = h('div', { class: 'bar' }, [els.recordBtn, els.assertBtn, els.assertType, els.assertHint, els.selectionBtn, hint('have_content', 'What does Assert selection write?'), els.noSelectionBtn, hint('have_no_content', 'Why have_no_content beats not_to have_content'), els.pathBtn, hint('have_current_path', 'What does Assert path write?'), els.hoverBtn, els.i18nBtn]);
     els.body = h('div', { class: 'body' });
     els.saveBtn = h('button', { class: 'primary', text: 'Save', title: 'Alt+Shift+S', onclick: function () { command('save'); } });
     els.finishBtn = h('button', { class: 'primary', text: 'Save & finish', onclick: function () { command('save_and_finish'); } });
@@ -177,16 +249,18 @@ MT.toolbar = (function () {
     if (!state) { body.appendChild(h('div', { class: 'empty', text: 'Connecting to the recording session…' })); return; }
     var steps = state.steps || [];
     var saved = state.saved_count || 0;
-    body.appendChild(h('h4', { text: 'Steps (' + (steps.length - saved) + ' pending, ' + saved + ' saved)' }));
+    body.appendChild(h('h4', {}, ['Steps (' + (steps.length - saved) + ' pending, ' + saved + ' saved) ', hint('confidence', 'What do the coloured badges mean?')]));
     if (!steps.length) body.appendChild(h('div', { class: 'empty', text: 'Click around the app. Every step shows here as the exact Ruby line it will produce.' }));
     steps.forEach(function (step, i) {
       var isSaved = i < saved;
       var replay = state.replay && state.replay[step.id];
+      var badge = h('button', { type: 'button', class: 'badge ' + step.confidence, 'data-why': step.id, 'aria-label': 'Why this locator?', title: (step.confidence === 'green' ? 'Unique semantic locator (verified)' : (step.confidence === 'amber' ? 'Scoped or CSS locator' : 'Needs review')) + ' — click: why this locator?' });
+      badge.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); if (popover && popover.anchor === badge) closePopover(); else openPopover(badge, whyLocator(step)); });
       var row = h('div', { class: 'step' + (isSaved ? ' saved' : '') }, [
-        h('span', { class: 'badge ' + step.confidence, title: step.confidence === 'green' ? 'Unique semantic locator (verified)' : (step.confidence === 'amber' ? 'Scoped or CSS locator' : 'Needs review') }),
+        badge,
         h('div', {}, [
           h('div', { class: 'code', text: step.code || '(nothing)' }),
-          step.review ? h('div', { class: 'review', text: '⚠ ' + step.review }) : null,
+          step.review ? h('div', { class: 'review' }, ['⚠ ' + step.review + ' ', hint('review_comment', 'What is a REVIEW comment?')]) : null,
           replay ? h('div', { class: 'review', text: replay.ok === false ? '✗ does not resolve (' + (replay.error || ('found ' + replay.found)) + ')' : (replay.ok ? '✓ resolves' : '– ' + (replay.note || '')) }) : null
         ]),
         isSaved ? h('span') : h('div', { class: 'actions' }, [
@@ -204,7 +278,7 @@ MT.toolbar = (function () {
         body.appendChild(h('div', { class: 'sugg' }, [
           h('button', { text: '+', title: 'Add this assertion as a step', onclick: function () { MT.transport.command('accept_suggestion', { suggestion_id: s.id }).then(render); } }),
           s.candidates && s.candidates.length ? h('button', { text: '+block', title: 'Add the expect { } block form instead', onclick: function () { MT.transport.command('accept_suggestion', { suggestion_id: s.id, alternative: s.candidates[0].code }).then(render); } }) : null,
-          h('div', { class: 'code', text: s.code })
+          h('div', { class: 'code' }, [s.code + ' ', hint(suggestionHintKey(s), 'What does this assertion check?')])
         ]));
       });
     }
@@ -272,6 +346,8 @@ MT.toolbar = (function () {
   }
 
   // Alt+Shift+<key> avoids Chrome's and Studiz's shortcuts.
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePopover(); }, true);
+
   function shortcut(e) {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return false;
     var key = (e.code || '').replace('Key', '').toLowerCase() || (e.key || '').toLowerCase();

@@ -15,7 +15,7 @@ RSpec.describe('Student profile', :js, type: :system) do
   end
 
   context 'when signed in as a provider' do
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:discount) { create(:discount, :active, provider: provider, name_da: 'Kaffe 20%') }
 
     before do

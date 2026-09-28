@@ -11,16 +11,28 @@ W.api = {
   }
 };
 
+W.emptyPlan = function () {
+  return { description: '', target: { path: '', block: null }, signed_in: null, models: [], start: { route: '', params: {}, locale: 'da' },
+    extras: { flags: [], travel_to: null, viewport: null, cookie_consent: true, sidekiq_inline: false, mail_assertion: false, fixture_files: [] } };
+};
+
 W.state = {
   catalogue: null,
-  plan: { description: '', target: { path: '', block: null }, signed_in: null, models: [], start: { route: '', params: {}, locale: 'da' },
-    extras: { flags: [], travel_to: null, viewport: null, cookie_consent: true, sidekiq_inline: false, mail_assertion: false, fixture_files: [] } },
+  plan: W.emptyPlan(),
   preview: null,
   issues: [],
   blocks: [],
   preflight: null,
   preflightedPlan: null,
-  status: 'planning'
+  status: 'planning',
+  // 1.2 stepper: the current step (1-4), the fields a person touched and the
+  // steps where Next was pressed: errors show only for those.
+  step: 1,
+  touched: {},
+  nextPressed: {},
+  pathEdited: false,
+  source: null, // 'starter:<id>' | 'template:<slug>' | 'last' | 'blank'
+  showAllFactories: false
 };
 
 W.h = function (tag, attrs, children) {
@@ -46,6 +58,30 @@ W.util = {
   uniqueLet: function (base) { var names = W.util.letNames(); var n = base; var i = 2; while (names.indexOf(n) >= 0) { n = base + '_' + (i++); } return n; },
   signedInModel: function () { var p = W.state.plan; return p.models.filter(function (m) { return m.let === p.signed_in; })[0] || null; },
   roleClass: function () { return W.util.classOf(W.util.signedInModel()); },
+  learnedFactory: function (name) { var l = W.state.catalogue && W.state.catalogue.learned; return (l && l.factories && l.factories[name]) || { usage: 0, default_traits: [], default_traits_files: 0, combinations: [], kwargs: [], infrastructure: false }; },
+  // A fresh model for a factory, pre-ticked with the trait combination the specs use most.
+  newModel: function (factoryName, letName) {
+    var f = W.util.factory(factoryName);
+    var learned = W.util.learnedFactory(f ? f.name : factoryName);
+    var traits = (learned.default_traits || []).filter(function (t) { return f && f.traits.indexOf(t) >= 0; });
+    return { let: letName || W.util.uniqueLet(factoryName.split('_').pop()), factory: f ? f.name : factoryName, traits: traits, count: 1, associations: {}, attributes: {} };
+  },
+  touch: function (field) { W.state.touched[field] = true; },
+  // Errors are shown for a field once it was touched, or once Next was pressed on its step.
+  showsErrorFor: function (field) {
+    var st = W.state;
+    if (st.touched[field]) return true;
+    return !!st.nextPressed[W.steps.stepOfField(field)];
+  },
+  agoText: function (iso) {
+    if (!iso) return 'not verified yet';
+    var mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 2) return 'verified just now';
+    if (mins < 90) return 'verified ' + mins + ' min ago';
+    var hours = Math.round(mins / 60);
+    if (hours < 36) return 'verified ' + hours + ' h ago';
+    return 'verified ' + Math.round(hours / 24) + ' d ago';
+  },
   namespaceFor: function () {
     var cls = W.util.roleClass();
     if (!cls) return ['public'];

@@ -22,6 +22,39 @@ RSpec.describe(MagicTest::Wizard::Codegen) do
      "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}}
   end
 
+  # B3 (1.2): a block that is not found must never turn into "new file" mode
+  # (that replaced the existing file).
+  it "raises, listing the file's blocks, when the target block is not found in an existing file" do
+    path = fixture("provider_discounts_spec.rb")
+    spec_file = MagicTest::Wizard::SpecFile.parse(path)
+    p = plan(base.merge("target" => {"path" => path, "block" => ["when nothing matches"]}))
+    expect { described_class.new(p, catalogue, spec_file: spec_file).skeleton }.to(raise_error(
+      MagicTest::Wizard::Error,
+      "block not found in #{path}: when nothing matches. Blocks in the file: describe 'Provider discounts' (line 4), context 'when the discount is archived' (line 18)"
+    ))
+  end
+
+  # B4 (1.2): the block comes from an exact reference into the parsed tree.
+  it "appends into a nested context picked by its exact reference, reusing the lets visible there" do
+    path = fixture("nested_duplicates_spec.rb")
+    spec_file = MagicTest::Wizard::SpecFile.parse(path)
+    ref = {"path" => ["Provider Discounts Page", "edit page", "Visuals"], "line" => 34, "header" => nil}
+    p = plan(base.merge("description" => "provider sees the name", "target" => {"path" => path, "block" => ref},
+      "start" => {"route" => "edit_provider_admin_discount", "params" => {"provider_id" => "provider", "id" => "discount"}}))
+    sk = described_class.new(p, catalogue, spec_file: spec_file).skeleton
+    expect(sk.mode).to(eq(:append_it))
+    expect(sk.reused.transform_values(&:name)).to(eq({"provider" => "provider", "discount" => "discount"}))
+    expect(sk.insert_before_line).to(eq(39))
+    expect(sk.source.lines[38, 5].join).to(eq(<<~RUBY.gsub(/^/, "      ").sub(/\A\s+\n/, "\n")))
+
+      it 'provider sees the name' do
+        visit(edit_provider_admin_discount_path(provider, discount))
+        magic_test
+      end
+    RUBY
+    expect(sk.source.lines.size).to(eq(spec_file.lines.size + 5))
+  end
+
   it "writes a new file in Studiz house style with parents first and magic_test last" do
     sk = described_class.build(plan(base), catalogue)
     expect(sk.mode).to(eq(:new_file))

@@ -100,10 +100,26 @@ MT.locators = (function () {
     return null;
   }
 
+  // B7: the nearest ancestor whose id embeds a record id (`#discount-card-42`):
+  // the stable wrapper of a card or row, written through the let by Ruby.
+  function recordScope(node) {
+    var el = node.parentElement;
+    var depth = 0;
+    var max = (MT.config && MT.config.max_ancestor_depth) || 8;
+    while (el && el !== document.body && depth < max) {
+      var id = MT.dynamic.recordId(el);
+      if (id && document.querySelectorAll('#' + MT.util.cssEscape(id)).length === 1) return { kind: 'record', css: '#' + MT.util.cssEscape(id), node: el };
+      el = el.parentElement;
+      depth += 1;
+    }
+    return null;
+  }
+
   function scopesFor(node) {
     var out = [];
     modalsOpen().forEach(function (m) { if (m.node.contains(node)) out.push(m); });
     var f = formScope(node); if (f) out.push(f);
+    var rec = recordScope(node); if (rec) out.push(rec);
     var r = rowScope(node); if (r) out.push(r);
     var h = headingScope(node); if (h) out.push(h);
     var a = ancestorScope(node); if (a) out.push(a);
@@ -190,6 +206,8 @@ MT.locators = (function () {
     var selectors = [];
     var id = MT.dynamic.stableId(node);
     if (id) selectors.push({ css: '#' + MT.util.cssEscape(id), by: 'id' });
+    var recordId = !id && MT.dynamic.recordId(node); // B7: `#discount-card-42`, rewritten through the let by Ruby
+    if (recordId) selectors.push({ css: '#' + MT.util.cssEscape(recordId), by: 'id', record_id: true });
     var name = MT.dynamic.stableName(node);
     if (name) selectors.push({ css: tag + '[name="' + name + '"]', by: 'name' });
     ['data-bs-target', 'data-bs-toggle', 'data-target', 'data-action', 'data-test', 'data-testid', 'aria-label', 'title'].forEach(function (a) {
@@ -209,7 +227,7 @@ MT.locators = (function () {
     selectors.push({ css: tag, by: 'tag' }); // last resort before positional: `td` with text, or inside a scope
     selectors.forEach(function (s) {
       var c = MT.capybara.cssCount(s.css, document, null, node);
-      out.push({ kind: 'css', by: s.by, locator: s.css, scope: null, exact: c.exact, partial: c.partial, unique: c.unique && c.target_matches });
+      out.push({ kind: 'css', by: s.by, locator: s.css, scope: null, exact: c.exact, partial: c.partial, unique: c.unique && c.target_matches, record_id: !!s.record_id });
       if (!(c.unique && c.target_matches) && text && text.length <= 60) {
         var ct = MT.capybara.cssCount(s.css, document, text, node);
         if (ct.unique && ct.target_matches) out.push({ kind: 'css', by: s.by, locator: s.css, text: text, scope: null, exact: 1, partial: 1, unique: true });

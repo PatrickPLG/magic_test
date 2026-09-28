@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("alert_from_js_erb") do
   description "provider sends a reminder and the js.erb response alerts"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:discount) { create(:discount, provider: provider, name_da: 'Kaffe 20%') }
 
     before do

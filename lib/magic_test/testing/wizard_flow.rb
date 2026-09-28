@@ -34,12 +34,16 @@ module MagicTest
         end
       end
 
-      attr_reader :name, :file, :script_block, :plans, :existing_fixture, :failure_pattern
+      attr_reader :name, :file, :script_block, :plans, :existing_fixture, :failure_pattern, :ui_block, :start_failure_pattern
 
       def initialize(name, file:)
         @name = name
         @file = File.expand_path(file)
         @plans = []
+        @env = {}
+        @ui_block = nil
+        @start_failure_pattern = nil
+        @template_run = nil
         @existing_fixture = nil
         @failure_pattern = nil
         @output_patterns = []
@@ -52,6 +56,11 @@ module MagicTest
         @plans << yaml
       end
       alias_method :then_plan, :plan
+
+      # Extra environment for the wizard run and the replays (a fixture configuration, for example).
+      def env(hash = nil)
+        hash ? @env.merge!(hash.transform_keys(&:to_s)) : @env
+      end
 
       # Fixture (spec/fixtures/wizard/<name>) copied to the target before the run.
       def existing(fixture_name)
@@ -71,6 +80,24 @@ module MagicTest
       def expect_output(pattern)
         @output_patterns << pattern
       end
+
+      # 1.2: drive the browser wizard's four steps instead of a plan file. The
+      # block runs in the wizard's ScriptDSL extended with Testing::WizardUi.
+      def ui(&block)
+        @ui_block = block
+      end
+
+      # The run must stop at Start with this error (B3: the file changed under the wizard).
+      def expect_start_failure(pattern)
+        @start_failure_pattern = pattern
+      end
+
+      # A second run through `bin/magic new --template <name> "description"` after the UI run.
+      def then_template(name, description)
+        @template_run = {name: name, description: description}
+      end
+
+      attr_reader :template_run
 
       attr_reader :output_patterns
 
@@ -107,6 +134,27 @@ module MagicTest
           File.write(File.join(support, "system_auth_helper.rb"), "require #{File.join(root, "spec/support/system_auth_helper").inspect}\n")
         end
         logs = []
+        if ui_block
+          if template_run && defined?(Rails) # a fresh template each run
+            require "magic_test/wizard/templates"
+            FileUtils.rm_f(MagicTest::Wizard::Templates.path(template_run[:name], Rails.root))
+          end
+          out, status = record_ui(root)
+          logs << out
+          if start_failure_pattern
+            raise "expected the UI run to stop at Start, but it succeeded:\n#{out.lines.last(30).join}" if status.success?
+            raise "the UI run failed, but not with #{start_failure_pattern.inspect}:\n#{out.lines.last(40).join}" unless out.match?(start_failure_pattern)
+            raise "a refused write must leave the file byte-identical, but #{target_path(root)} changed" if target_changed_after_failure?(root)
+            output_patterns.each { |pattern| raise "expected the wizard output to match #{pattern.inspect}:\n#{out.lines.last(40).join}" unless out.match?(pattern) }
+            return GoldenFlow::Result.new(flow: self, generated: "", expected: "", record_log: out, replays: [], rubocop: {ok: true, output: ""})
+          end
+          raise "wizard UI run failed (see #{work_dir(root)}/record_ui.log):\n#{out.lines.last(40).join}" unless status.success?
+          if template_run
+            out2, status2 = record_template(root)
+            logs << out2
+            raise "template run failed (see #{work_dir(root)}/record_template.log):\n#{out2.lines.last(40).join}" unless status2.success?
+          end
+        end
         plans.each_with_index do |yaml, i|
           plan_path = File.join(work_dir(root), "plan#{i + 1}.yml")
           File.write(plan_path, yaml.gsub(TARGET_PLACEHOLDER, target_path(root)))
@@ -136,6 +184,8 @@ module MagicTest
       private
 
       def target_changed_after_failure?(root)
+        snapshot = File.join(work_dir(root), "target_before_start.rb")
+        return File.read(target_path(root)) != File.read(snapshot) if File.exist?(snapshot)
         return File.exist?(target_path(root)) unless existing_fixture
         File.read(target_path(root)) != File.read(File.join(root, "spec/fixtures/wizard", existing_fixture))
       end
@@ -146,14 +196,46 @@ module MagicTest
           "MAGIC_TEST_SCRIPT" => File.expand_path("golden_wizard_script.rb", __dir__),
           "MAGIC_TEST_GOLDEN_FLOW" => file, "MAGIC_TEST_GOLDEN_NAME" => name,
           "FIXTURE_APP_DB" => File.join(work_dir(root), "record#{index + 1}.sqlite3"), "RAILS_ENV" => "test"
-        }
+        }.merge(self.env)
         out, status = Open3.capture2e(env, "bin/rspec", File.join(root, "lib/magic_test/wizard/entry_spec.rb"), chdir: root)
         File.write(File.join(work_dir(root), "record#{index + 1}.log"), out)
         [out, status]
       end
 
+      # The browser wizard driven through its four steps by the flow's `ui` block.
+      def record_ui(root)
+        env = {
+          "MAGIC_TEST" => "1", "MAGIC_TEST_HEADLESS" => "1", "MAGIC_TEST_WIZARD" => "browser",
+          "MAGIC_TEST_WIZARD_SCRIPT" => File.expand_path("golden_wizard_ui_script.rb", __dir__),
+          "MAGIC_TEST_SCRIPT" => File.expand_path("golden_wizard_script.rb", __dir__),
+          "MAGIC_TEST_GOLDEN_FLOW" => file, "MAGIC_TEST_GOLDEN_NAME" => name,
+          "MAGIC_TEST_UI_TARGET" => target_path(root), "MAGIC_TEST_UI_WORK" => work_dir(root),
+          "FIXTURE_APP_DB" => File.join(work_dir(root), "record_ui.sqlite3"), "RAILS_ENV" => "test"
+        }.merge(self.env)
+        out, status = Open3.capture2e(env, "bin/rspec", File.join(root, "lib/magic_test/wizard/entry_spec.rb"), chdir: root)
+        File.write(File.join(work_dir(root), "record_ui.log"), out)
+        [out, status]
+      end
+
+      # `bin/magic new --template <name> "description"` (through the entry spec, headless), recording again.
+      def record_template(root)
+        FileUtils.rm_f(target_path(root))
+        env = {
+          "MAGIC_TEST" => "1", "MAGIC_TEST_HEADLESS" => "1", "MAGIC_TEST_WIZARD" => "browser",
+          "MAGIC_TEST_WIZARD_TEMPLATE" => template_run[:name], "MAGIC_TEST_WIZARD_DESCRIPTION" => template_run[:description],
+          "MAGIC_TEST_WIZARD_TARGET" => target_path(root),
+          "MAGIC_TEST_WIZARD_SCRIPT" => File.expand_path("golden_wizard_template_script.rb", __dir__),
+          "MAGIC_TEST_SCRIPT" => File.expand_path("golden_wizard_script.rb", __dir__),
+          "MAGIC_TEST_GOLDEN_FLOW" => file, "MAGIC_TEST_GOLDEN_NAME" => name,
+          "FIXTURE_APP_DB" => File.join(work_dir(root), "record_template.sqlite3"), "RAILS_ENV" => "test"
+        }.merge(self.env)
+        out, status = Open3.capture2e(env, "bin/rspec", File.join(root, "lib/magic_test/wizard/entry_spec.rb"), chdir: root)
+        File.write(File.join(work_dir(root), "record_template.log"), out)
+        [out, status]
+      end
+
       def replay(root, index)
-        env = {"FIXTURE_APP_DB" => File.join(work_dir(root), "replay#{index}.sqlite3"), "RAILS_ENV" => "test", "MAGIC_TEST" => nil, "MAGIC_TEST_SCRIPT" => nil, "MAGIC_TEST_WIZARD" => nil}
+        env = {"FIXTURE_APP_DB" => File.join(work_dir(root), "replay#{index}.sqlite3"), "RAILS_ENV" => "test", "MAGIC_TEST" => nil, "MAGIC_TEST_SCRIPT" => nil, "MAGIC_TEST_WIZARD" => nil}.merge(self.env)
         out, status = Open3.capture2e(env, "bin/rspec", target_path(root), chdir: root)
         File.write(File.join(work_dir(root), "replay#{index}.log"), out)
         {ok: status.success?, output: out}

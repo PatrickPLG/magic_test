@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("provider_edits_discount") do
   description "provider edits a discount"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:discount) { create(:discount, provider: provider, name_da: 'Kaffe 20%', status: 'draft') }
     let!(:categories) { %w[Fest Foredrag Sport Kultur Musik].map { |n| create(:category, name: n) } }
 

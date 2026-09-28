@@ -5,7 +5,7 @@ require "rails_helper"
 # equal `page.all(kind, locator, exact: true/false).size`, on several fixture
 # pages, with the same visibility/disabled filters.
 RSpec.describe("Capybara matching parity", :recorder, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:institution) { create(:institution, :with_user, allow_events: true) }
   let!(:student) { create(:student, automatic_verified: true).tap { |s| s.user.update!(onboarded: true) } }
   let!(:categories) { %w[Fest Foredrag Sport Kultur Musik].map { |n| create(:category, name: n) } }

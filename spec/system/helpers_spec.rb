@@ -3,7 +3,7 @@ require "rails_helper"
 # The gem-shipped helpers, exercised against the fixture app in a normal
 # (MAGIC_TEST unset) run: they must work in every test run.
 RSpec.describe("MagicTest::Helpers", :no_recorder, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:institution) { create(:institution, :with_user, allow_events: true) }
   let!(:categories) { %w[Fest Foredrag Sport Kultur Musik].map { |n| create(:category, name: n) } }
   let!(:discount) { create(:discount, provider: provider, name_da: "Kaffe 20%", status: "draft") }

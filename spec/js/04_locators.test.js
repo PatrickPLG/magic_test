@@ -22,14 +22,24 @@
       assert.ok(scoped, 'row-scoped candidate');
       assert.equal(scoped.scope.css, 'tr'); assert.equal(scoped.scope.text, 'Lead 2'); assert.equal(scoped.unique, true);
     });
-    t.it('never proposes ids embedding record ids, timestamps or trix counters', function () {
+    t.it('never proposes ids embedding record ids, timestamps or trix counters (record ids only flagged, for the let)', function () {
       var card = document.querySelector('[data-discount-id]');
-      MT.locators.cssCandidates(card).forEach(function (x) { assert.ok(!/discount-card-\d/.test(x.locator), x.locator); });
+      MT.locators.cssCandidates(card).forEach(function (x) { assert.ok(!/discount-card-\d/.test(x.locator) || x.record_id === true, x.locator); });
       var nested = document.querySelector('input[name*="1695551234567"]');
       MT.locators.candidates(nested, ['fillable_field']).forEach(function (x) { assert.ok(!/1695551234567/.test(x.locator), x.locator); });
       var trix = document.querySelector('trix-editor');
       MT.locators.candidates(trix, ['trix']).forEach(function (x) { assert.ok(!/trix_input/.test(x.locator), x.locator); });
       assert.ok(MT.locators.candidates(trix, ['trix']).some(function (x) { return x.by === 'id' && x.locator === 'events_event_description' && x.unique; }));
+    });
+    t.it('offers the card wrapper whose id embeds the record id as a record scope and a flagged id (B7)', function () {
+      var card = document.querySelector('[data-discount-id]');
+      var inner = card.querySelector('*');
+      var scopes = MT.locators.scopesFor(inner);
+      var rec = scopes.filter(function (s) { return s.kind === 'record'; })[0];
+      assert.ok(rec, 'record scope present');
+      assert.ok(/^#discount-card-\d+$/.test(rec.css), rec.css);
+      var own = MT.locators.cssCandidates(card).filter(function (x) { return x.by === 'id'; })[0];
+      assert.ok(own && own.record_id === true && /^#discount-card-\d+$/.test(own.locator), 'own id flagged as a record id');
     });
     t.it('positional selectors only inside a stable scope and never absolute', function () {
       var star = document.querySelector('#lead_3 .js-star');

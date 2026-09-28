@@ -3,20 +3,28 @@ module MagicTest
   # `sql.active_record` and maps tables to models (including namespaced ones
   # such as Events::Event) to suggest count/attribute expectations.
   class DbChanges
-    STATEMENT = /\A\s*(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+[`"]?([A-Za-z0-9_]+)[`"]?/i
+    # B8: the shapes every adapter emits. Postgres adds `$1` binds and RETURNING
+    # (harmless), may schema-qualify the table ("public"."discounts"), and
+    # Rails' query logs or marginalia may put a /* comment */ first; a CTE
+    # (`WITH x AS (...) UPDATE ...`) precedes the statement.
+    LEADING_COMMENT = %r{\A(?:\s*/\*.*?\*/)*\s*}m
+    CTE = /\AWITH\s+.*?\)\s+(?=INSERT|UPDATE|DELETE)/im
+    STATEMENT = /\A(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+((?:[`"]?[A-Za-z0-9_]+[`"]?\s*\.\s*)*[`"]?([A-Za-z0-9_]+)[`"]?)/i
 
     Change = Struct.new(:operation, :table, :model, :count)
 
     class << self
       def parse(sql)
-        m = STATEMENT.match(sql.to_s)
+        text = sql.to_s.sub(LEADING_COMMENT, "")
+        text = text.sub(CTE, "") if text.match?(/\AWITH\b/i)
+        m = STATEMENT.match(text)
         return nil unless m
         op = if m[1].upcase.start_with?("INSERT")
           :insert
         else
           (m[1].upcase.start_with?("UPDATE") ? :update : :delete)
         end
-        [op, m[2]]
+        [op, m[3]]
       end
 
       # Configurable in MagicTest.config.ignored_tables (merged with

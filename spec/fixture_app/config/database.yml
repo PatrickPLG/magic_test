@@ -1,5 +1,18 @@
+# SQLite by default (one file per parallel run through FIXTURE_APP_DB);
+# FIXTURE_APP_ADAPTER=postgresql switches to Postgres, like Studiz, with one
+# database per run derived from the same FIXTURE_APP_DB name (created on boot).
 test:
+<% if ENV["FIXTURE_APP_ADAPTER"] == "postgresql" %>
+  adapter: postgresql
+  database: <%= ENV.fetch("FIXTURE_APP_PG_DB") { "magic_test_" + File.basename(ENV.fetch("FIXTURE_APP_DB", "test"), ".sqlite3").gsub(/[^a-z0-9_]/i, "_").downcase } %>
+  host: <%= ENV.fetch("PGHOST", "localhost") %>
+  port: <%= ENV.fetch("PGPORT", "5432") %>
+  username: <%= ENV.fetch("PGUSER", "postgres") %>
+  password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
+  pool: 25
+<% else %>
   adapter: sqlite3
   database: <%= ENV.fetch("FIXTURE_APP_DB", "db/test.sqlite3") %>
   pool: 25
   timeout: 10000
+<% end %>
