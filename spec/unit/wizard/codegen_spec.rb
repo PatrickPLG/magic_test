@@ -22,6 +22,18 @@ RSpec.describe(MagicTest::Wizard::Codegen) do
      "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}}
   end
 
+  # B3 (1.2): a block that is not found must never turn into "new file" mode
+  # (that replaced the existing file).
+  it "raises, listing the file's blocks, when the target block is not found in an existing file" do
+    path = fixture("provider_discounts_spec.rb")
+    spec_file = MagicTest::Wizard::SpecFile.parse(path)
+    p = plan(base.merge("target" => {"path" => path, "block" => ["when nothing matches"]}))
+    expect { described_class.new(p, catalogue, spec_file: spec_file).skeleton }.to(raise_error(
+      MagicTest::Wizard::Error,
+      "block not found in #{path}: when nothing matches. Blocks in the file: describe 'Provider discounts' (line 4), context 'when the discount is archived' (line 18)"
+    ))
+  end
+
   it "writes a new file in Studiz house style with parents first and magic_test last" do
     sk = described_class.build(plan(base), catalogue)
     expect(sk.mode).to(eq(:new_file))

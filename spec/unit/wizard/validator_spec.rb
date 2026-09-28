@@ -19,6 +19,20 @@ RSpec.describe(MagicTest::Wizard::Validator) do
     validator.issues.map { |i| "#{i.severity}: #{i.field}: #{i.message}" }
   end
 
+  # B3 (1.2): a block name that is not in the existing file is an error that
+  # lists what is there, before anything reaches codegen or the writer.
+  it "errors when the target block is not in the existing file and lists the blocks it found" do
+    dir = Pathname(File.expand_path("../../../tmp/wizard_spec_fixtures", __dir__))
+    FileUtils.mkdir_p(dir)
+    path = dir.join("provider_discounts_spec.rb").to_s
+    FileUtils.cp(File.expand_path("../../fixtures/wizard/provider_discounts_spec.rb.txt", __dir__), path)
+    v = described_class.validate(plan("target" => {"path" => path, "block" => ["Visuals"]}), catalogue)
+    issue = v.errors.find { |i| i.field == "target.block" }
+    expect(issue).not_to(be_nil, messages(v).join("\n"))
+    expect(issue.message).to(eq("Block \"Visuals\" was not found in #{path}."))
+    expect(issue.fix).to(eq("pick one of: describe 'Provider discounts' (line 4), context 'when the discount is archived' (line 18)"))
+  end
+
   it "accepts a complete plan and auto-wires the one matching let" do
     v = described_class.validate(plan, catalogue)
     expect(v.errors).to(be_empty, messages(v).join("\n"))
