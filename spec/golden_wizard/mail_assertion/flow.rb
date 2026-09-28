@@ -10,6 +10,7 @@ MagicTest::Testing::WizardFlow.define("mail_assertion") do
     models:
       - let: provider
         factory: provider
+        traits: [with_cvr]
       - let: discount
         factory: discount
         traits: [active]

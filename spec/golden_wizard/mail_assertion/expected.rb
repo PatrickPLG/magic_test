@@ -2,7 +2,7 @@ require 'rails_helper'
 
 # provider sends a reminder email
 RSpec.describe('Provider sends a reminder email', :js, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:discount) { create(:discount, :active, provider: provider) }
 
   before do

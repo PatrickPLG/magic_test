@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("chosen_no_search_and_tabs") do
   description "provider sets the status with the search-less Chosen select and uses the description"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:discount) { create(:discount, provider: provider, name_da: 'Kaffe 20%', status: 'draft') }
 
     before do

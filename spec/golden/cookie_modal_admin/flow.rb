@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("cookie_modal_admin") do
   description "provider without the cookie setting accepts only necessary cookies"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
 
     before do
       provider.user.ensure_authentication_token

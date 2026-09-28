@@ -10,6 +10,7 @@ MagicTest::Testing::WizardFlow.define("sidekiq_inline") do
     models:
       - let: provider
         factory: provider
+        traits: [with_cvr]
       - let: discount
         factory: discount
         traits: [active]

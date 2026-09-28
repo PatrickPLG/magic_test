@@ -198,7 +198,7 @@ FactoryBot.define do
   end
 
   factory :discount do
-    provider
+    association :provider, factory: [:provider, :with_cvr]
     sequence(:name_da) { |n| "Kaffe #{n * 10}%" }
     status { "active" }
 
@@ -228,7 +228,7 @@ FactoryBot.define do
   end
 
   factory :invoice do
-    provider
+    association :provider, factory: [:provider, :with_cvr]
     sequence(:number) { |n| "F-2026-#{n}" }
     amount_cents { 12_500 }
   end

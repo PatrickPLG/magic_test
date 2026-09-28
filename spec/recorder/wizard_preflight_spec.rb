@@ -42,7 +42,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "reports a 403 when the signed-in role does not own the record" do
-    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider"}, {"let" => "other_provider", "factory" => "provider"}],
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}, {"let" => "other_provider", "factory" => "provider", "traits" => ["with_cvr"]}],
       "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "other_provider"}}))
     expect(result.ok).to(be(false))
     f = result.failures.first
@@ -53,7 +53,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "reports a route param that points at the wrong let" do
-    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider"}],
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
       "start" => {"route" => "institution_students", "params" => {"institution_id" => "provider"}}))
     expect(result.ok).to(be(false))
     f = result.failures.first
@@ -63,7 +63,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "reports a guest redirected to the login page" do
-    result = preflight(plan("models" => [{"let" => "provider", "factory" => "provider"}],
+    result = preflight(plan("models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
       "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
     expect(result.ok).to(be(false))
     f = result.failures.first
@@ -73,7 +73,7 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   end
 
   it "passes, keeps the records, signs in and lands on the page with a screenshot" do
-    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider"}, {"let" => "discount", "factory" => "discount"}],
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}, {"let" => "discount", "factory" => "discount"}],
       "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
     expect(result.ok).to(be(true), result.summary)
     expect(result.status).to(eq(200))

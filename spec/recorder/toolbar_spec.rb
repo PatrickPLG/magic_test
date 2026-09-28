@@ -3,7 +3,7 @@ require "rails_helper"
 # The toolbar lives in a Shadow DOM host (`[data-magic-test=toolbar]`). These
 # examples read its text the way a person sees it, after real clicks.
 RSpec.describe("Toolbar", :recorder, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:discount) { create(:discount, provider: provider, name_da: "Kaffe 20%", status: "active") }
 
   def toolbar_text

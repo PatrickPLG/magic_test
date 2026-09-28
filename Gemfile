@@ -18,6 +18,7 @@ gem "route_translator", "~> 14.1"
 gem "database_cleaner-active_record", "~> 2.1"
 gem "kaminari", "~> 1.2"
 gem "sqlite3", "~> 1.6"
+gem "pg", "~> 1.5" # FIXTURE_APP_ADAPTER=postgresql runs the fixture app on Postgres, like Studiz
 gem "puma", "~> 6.4"
 # Studiz feature flags and background jobs (memory adapter, faked jobs in specs).
 gem "flipper", "~> 1.3"

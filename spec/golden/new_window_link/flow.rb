@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("new_window_link") do
   description "provider opens the invoice in a new window and marks it paid"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:invoice) { create(:invoice, provider: provider, number: 'F-2026-1') }
 
     before do

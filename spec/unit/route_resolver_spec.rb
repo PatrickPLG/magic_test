@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe(MagicTest::RouteResolver) do
   let(:resolver) { described_class.new }
   let!(:institution) { create(:institution) }
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:discount) { create(:discount, provider: provider) }
 
   it "prefers the locale-agnostic helper for Danish (default locale) paths" do
@@ -43,7 +43,7 @@ RSpec.describe(MagicTest::RouteResolver) do
   end
 
   it "reports ambiguity when two lets have the same id" do
-    twin = create(:provider)
+    twin = create(:provider, :with_cvr)
     allow(twin).to(receive(:id).and_return(institution.id))
     result = resolver.resolve("/institutioner/#{institution.id}/studerende", memoized: {institution: institution, provider: twin})
     expect(result.code).to(eq("institution_students_path(institution)"))

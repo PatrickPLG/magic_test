@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe('Backoffice edits the second lead in a table where every row says rediger', :js, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:leads) { %w[Anders Bente Carl].map { |n| create(:lead, name: n, email: "#{n.downcase}@x.dk") } }
 
   before do

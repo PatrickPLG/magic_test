@@ -4,7 +4,7 @@ require "rails_helper"
 # fixture app's JS test page, with the recorder bundle loaded by the
 # middleware. One RSpec example per file; failures list the failing JS tests.
 RSpec.describe("Recorder JavaScript unit tests", :recorder, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
   let!(:discount) { create(:discount, provider: provider, name_da: "Kaffe 20%") }
   let!(:categories) { %w[Fest Foredrag Sport Kultur Musik].map { |n| create(:category, name: n) } }
 

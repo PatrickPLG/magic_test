@@ -1,7 +1,7 @@
 MagicTest::Testing::GoldenFlow.define("bootstrap_modal_confirm") do
   description "provider archives a discount through the ajax-modal confirmation"
   setup <<~RUBY
-    let!(:provider) { create(:provider) }
+    let!(:provider) { create(:provider, :with_cvr) }
     let!(:discount) { create(:discount, provider: provider, name_da: 'Kaffe 20%') }
 
     before do

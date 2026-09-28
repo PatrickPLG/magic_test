@@ -1,7 +1,7 @@
 # Verbatim shape of Studiz's spec/support/system_auth_helper.rb (Appendix B).
 module SystemAuthHelper
   def sign_in_as_provider(provider = nil)
-    provider ||= create(:provider)
+    provider ||= create(:provider, :with_cvr)
     provider.user.ensure_authentication_token
     sign_in provider.user
     page.driver.set_cookie("auth_token", provider.user.authentication_token)

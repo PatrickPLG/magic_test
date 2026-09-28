@@ -1,7 +1,7 @@
 require 'rails_helper'
 
 RSpec.describe('Provider without the cookie setting accepts only necessary cookies', :js, type: :system) do
-  let!(:provider) { create(:provider) }
+  let!(:provider) { create(:provider, :with_cvr) }
 
   before do
     provider.user.ensure_authentication_token
