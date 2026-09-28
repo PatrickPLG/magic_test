@@ -10,7 +10,10 @@ RSpec.describe("Terminal wizard", :recorder, type: :system) do
   let(:target) { root.join("spec/system/provider/renames_spec.rb") }
   let(:output) { StringIO.new }
 
-  before { FileUtils.rm_rf(root) }
+  before do
+    studiz_driven_by
+    FileUtils.rm_rf(root)
+  end
 
   def run_tui(answers)
     runner = MagicTest::Wizard::Runner.new(self)

@@ -7,7 +7,10 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
   let(:root) { Rails.root.join("tmp/wizard_preflight") }
   let(:runner) { MagicTest::Wizard::Runner.new(self) }
 
-  before { FileUtils.rm_rf(root) }
+  before do
+    studiz_driven_by
+    FileUtils.rm_rf(root)
+  end
 
   def plan(h)
     base = {"description" => "x", "target" => {"path" => root.join("spec/system/x_spec.rb").to_s}}

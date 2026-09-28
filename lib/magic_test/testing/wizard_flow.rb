@@ -40,6 +40,7 @@ module MagicTest
         @name = name
         @file = File.expand_path(file)
         @plans = []
+        @env = {}
         @existing_fixture = nil
         @failure_pattern = nil
         @output_patterns = []
@@ -52,6 +53,11 @@ module MagicTest
         @plans << yaml
       end
       alias_method :then_plan, :plan
+
+      # Extra environment for the wizard run and the replays (a fixture configuration, for example).
+      def env(hash = nil)
+        hash ? @env.merge!(hash.transform_keys(&:to_s)) : @env
+      end
 
       # Fixture (spec/fixtures/wizard/<name>) copied to the target before the run.
       def existing(fixture_name)
@@ -146,14 +152,14 @@ module MagicTest
           "MAGIC_TEST_SCRIPT" => File.expand_path("golden_wizard_script.rb", __dir__),
           "MAGIC_TEST_GOLDEN_FLOW" => file, "MAGIC_TEST_GOLDEN_NAME" => name,
           "FIXTURE_APP_DB" => File.join(work_dir(root), "record#{index + 1}.sqlite3"), "RAILS_ENV" => "test"
-        }
+        }.merge(self.env)
         out, status = Open3.capture2e(env, "bin/rspec", File.join(root, "lib/magic_test/wizard/entry_spec.rb"), chdir: root)
         File.write(File.join(work_dir(root), "record#{index + 1}.log"), out)
         [out, status]
       end
 
       def replay(root, index)
-        env = {"FIXTURE_APP_DB" => File.join(work_dir(root), "replay#{index}.sqlite3"), "RAILS_ENV" => "test", "MAGIC_TEST" => nil, "MAGIC_TEST_SCRIPT" => nil, "MAGIC_TEST_WIZARD" => nil}
+        env = {"FIXTURE_APP_DB" => File.join(work_dir(root), "replay#{index}.sqlite3"), "RAILS_ENV" => "test", "MAGIC_TEST" => nil, "MAGIC_TEST_SCRIPT" => nil, "MAGIC_TEST_WIZARD" => nil}.merge(self.env)
         out, status = Open3.capture2e(env, "bin/rspec", target_path(root), chdir: root)
         File.write(File.join(work_dir(root), "replay#{index}.log"), out)
         {ok: status.success?, output: out}

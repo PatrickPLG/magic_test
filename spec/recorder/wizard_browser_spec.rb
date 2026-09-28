@@ -8,7 +8,10 @@ RSpec.describe("Browser wizard", :recorder, type: :system) do
   let(:root) { File.expand_path("../..", __dir__) }
   let(:work) { File.join(root, "tmp", "wizard_ui") }
 
-  before { FileUtils.rm_rf(work) }
+  before do
+    studiz_driven_by
+    FileUtils.rm_rf(work)
+  end
 
   def run_wizard(script, target:, db:)
     FileUtils.mkdir_p(File.dirname(target))
