@@ -129,7 +129,9 @@ module MagicTest
 
       # :new_file, :append_it (everything already there) or :new_context.
       def mode
-        return :new_file unless spec_file && block
+        return :new_file unless spec_file
+        # B3: an existing file is never rewritten as a new file.
+        raise Wizard::Error, "block not found in #{spec_file.path}: #{Array(plan.target.block).join(" > ").presence || "(no describe block)"}. Blocks in the file: #{spec_file.blocks_summary}" unless block
         return :append_it if let_lines.empty? && setup_lines.empty?
         :new_context
       end

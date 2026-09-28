@@ -65,6 +65,7 @@ module MagicTest
       # Writes the skeleton and returns the call site the recorder writes above.
       def write(codegen)
         written = Writer.write(codegen.skeleton, path_for(codegen.plan))
+        puts "magic_test wizard: the previous #{File.basename(written.path)} is backed up at #{written.backup}" if written.backup
         save_plan(codegen.plan)
         MagicTest::CallSite.new(path: written.path, line: written.line, source_line: written.source_line, example_line: nil, example_description: codegen.plan.description)
       end

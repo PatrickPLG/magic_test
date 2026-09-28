@@ -51,6 +51,11 @@ module MagicTest
           (parent ? parent.path : []) + [description]
         end
 
+        # "context 'when archived' (line 18)": how errors and pickers name a block.
+        def label
+          "#{kind} '#{description}' (line #{first_line})"
+        end
+
         # Lets visible inside this block: its own plus its ancestors'.
         def visible_lets
           (parent ? parent.visible_lets : []) + lets
@@ -90,6 +95,11 @@ module MagicTest
 
       def all_blocks
         blocks.flat_map(&:all_blocks)
+      end
+
+      # Every block of the file, labelled with its line, for error messages.
+      def blocks_summary
+        all_blocks.map(&:label).join(", ")
       end
 
       # Block by description path (["Provider discounts", "when signed in"]);

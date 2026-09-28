@@ -93,6 +93,23 @@ module MagicTest
         path = plan.target.path.to_s
         return add(:error, "target.path", "Choose a spec file to write to.", "e.g. spec/system/provider/edits_discount_spec.rb") if path.empty?
         add(:error, "target.path", "The spec file must end with _spec.rb.", "rename it to #{File.basename(path, ".rb")}_spec.rb") unless path.end_with?("_spec.rb")
+        check_target_block(path)
+      end
+
+      # B3: a block that is not in the existing file is an error here, so the
+      # generator never falls back to "new file" over an existing one.
+      def check_target_block(path)
+        full = Wizard.resolve_path(path, root: catalogue.root)
+        return unless File.file?(full)
+        spec_file = SpecFile.parse(full)
+        if spec_file.all_blocks.empty?
+          return add(:error, "target.block", "#{path} has no describe block to append to.", "pick another file or write a new one")
+        end
+        return if plan.target.block.blank?
+        return if spec_file.find_block(plan.target.block)
+        add(:error, "target.block", "Block #{Array(plan.target.block).join(" > ").inspect} was not found in #{full}.", "pick one of: #{spec_file.blocks_summary}")
+      rescue SyntaxError => e
+        add(:error, "target.path", "#{path} could not be parsed: #{e.message.lines.first&.strip}", "fix the syntax error or pick another file")
       end
 
       def check_models
