@@ -26,12 +26,14 @@ RSpec.describe("Terminal wizard", :recorder, type: :system) do
 
   it "asks the questions, preflights in this browser, writes the skeleton and starts recording" do
     answers = [
+      "Blank", # start from
       "provider renames a discount", "new file", target.to_s,
       "Provider", "provider", "with_cvr",
       "discount", "discount", "active", "1", "provider", "name_da=Kaffe 20%", "", "",
       "provider_admin_discounts_path", "provider", "da",
       "", "", "desktop", "", "", "",
       "y", # run preflight
+      "n", # save as template?
       "y"  # write and record
     ]
     recorded, = run_tui(answers)
@@ -46,6 +48,7 @@ RSpec.describe("Terminal wizard", :recorder, type: :system) do
 
   it "shows a validation error with its fix and lets the person stop" do
     answers = [
+      "Blank", # start from
       "lead with a bad priority", "new file", target.to_s,
       "guest", # not signed in
       "lead", "lead", "", "1", "priority=urgent", "", "",

@@ -1,4 +1,5 @@
 require "magic_test/wizard"
+require "time"
 
 module MagicTest
   module Wizard
@@ -20,7 +21,14 @@ module MagicTest
 
       def run
         say "magic_test #{MagicTest::VERSION} — new system test"
-        plan = collect(Plan.new)
+        plan = runner.template_plan
+        if plan
+          say "Template #{ENV["MAGIC_TEST_WIZARD_TEMPLATE"]}: #{plan.description}"
+          plan.description = ask("Describe the test (becomes the `it` name)", default: plan.description.presence) if plan.description.blank?
+          plan.target = Plan::Target.new(path: ask("Path for the new file", default: Wizard.suggest_path(role_class_of(plan), plan.description)), block: nil) if plan.target.path.blank?
+        else
+          plan = collect(start_from)
+        end
         codegen = nil
         loop do
           validator = runner.validate(plan)
@@ -57,8 +65,56 @@ module MagicTest
           raise Abort, "preflight failed; nothing was written" unless yes?("Edit the plan and run preflight again?", default: true)
           plan = collect(plan)
         end
+        if yes?("Save this plan as a template for the next tests?", default: false)
+          name = ask("Template name", default: plan.description)
+          say "  saved #{Templates.save(plan, name, catalogue.root)}"
+        end
         raise Abort, "nothing was written" unless yes?("Write the skeleton and start recording?", default: true)
         runner.record(runner.write(codegen), plan)
+      end
+
+      # 1.2 §5: starters (with their last preflight), templates, the last plan, or blank.
+      def start_from
+        starters = Starters.list(catalogue).select { |st| st["available"] }
+        templates = Templates.list(catalogue.root)
+        last = runner.last_plan
+        options = starters.map { |st| "#{st["name"]} — #{starter_status(st)}" } + templates.map { |t| "Template: #{t["name"]}" } + (last ? ["Last plan: #{last.description}"] : []) + ["Blank"]
+        choice = choose("Start from", options, default: "Blank")
+        index = options.index(choice)
+        return Plan.new if choice == "Blank"
+        if index < starters.size
+          st = starters[index]
+          say "  starter #{st["name"]} failed its last preflight: #{st["message"]}" if st["ok"] == false
+          plan = Plan.from_h(st["plan"])
+          plan.description = ""
+          return plan
+        end
+        index -= starters.size
+        return Plan.from_h(templates[index]["plan"]) if index < templates.size
+        last
+      end
+
+      def starter_status(st)
+        return "not verified yet" unless st["verified_at"]
+        (st["ok"] == false) ? "failed last time: #{st["message"].to_s[0, 50]}" : "verified #{Time.iso8601(st["verified_at"]).strftime("%Y-%m-%d %H:%M")}"
+      end
+
+      def role_class_of(plan)
+        plan.signed_in_model && catalogue.factory(plan.signed_in_model.factory)&.class_name
+      end
+
+      # Trait options with the learned usage ("with_cvr  (used in 3 specs)").
+      def trait_options(factory)
+        learned = catalogue.learned
+        factory.traits.map do |t|
+          files = learned.trait_combinations(factory.name).select { |combo, _n| combo.include?(t) }.sum { |_c, n| n }
+          next t unless files.positive?
+          "#{t}  (in #{files} #{(files == 1) ? "spec" : "specs"})"
+        end
+      end
+
+      def trait_names(chosen)
+        chosen.map { |c| c.split(/\s+/).first }
       end
 
       # ---- questions -------------------------------------------------------
@@ -107,7 +163,8 @@ module MagicTest
         let = ask("Name of the let", default: plan.signed_in || role.factory.split("_").last)
         existing = plan.model(plan.signed_in) if plan.signed_in
         plan.models.delete(existing) if existing
-        traits = multi("Traits for :#{factory.name}", factory.traits, default: existing&.traits || [])
+        default_traits = existing&.traits.presence || catalogue.default_traits(factory.name).first
+        traits = trait_names(multi("Traits for :#{factory.name}", trait_options(factory), default: default_traits.map { |t| trait_options(factory).find { |o| o.split(/\s+/).first == t } || t }))
         plan.models.unshift(Plan::Model.new(let: let, factory: factory.name, traits: traits))
         plan.signed_in = let
       end
@@ -121,7 +178,7 @@ module MagicTest
         loop do
           name = ask("Add a model (factory name, blank to continue)", default: nil, allow_blank: true)
           break if name.blank?
-          matches = catalogue.factories.select { |f| f.name.include?(name) || f.aliases.any? { |a| a.include?(name) } }
+          matches = catalogue.ranked_factories(role_class_of(plan)).select { |f| f.name.include?(name) || f.aliases.any? { |a| a.include?(name) } }
           factory = if matches.size == 1
             matches.first
           elsif matches.empty?
@@ -131,7 +188,8 @@ module MagicTest
             catalogue.factory(choose("Which factory", matches.map(&:name), default: matches.first.name))
           end
           let = ask("Name of the let", default: factory.name.split("_").last)
-          traits = multi("Traits for :#{factory.name}", factory.traits, default: [])
+          learned_default = catalogue.default_traits(factory.name).first
+          traits = trait_names(multi("Traits for :#{factory.name}", trait_options(factory), default: learned_default.map { |t| trait_options(factory).find { |o| o.split(/\s+/).first == t } || t }))
           count = ask("How many (create_list when > 1)", default: "1").to_i
           model = Plan::Model.new(let: let, factory: factory.name, traits: traits, count: count)
           plan.models << model
@@ -163,8 +221,14 @@ module MagicTest
 
       def collect_start(plan)
         role_class = plan.signed_in_model && catalogue.factory(plan.signed_in_model.factory)&.class_name
-        routes = catalogue.routes_for_role(role_class)
-        labels = routes.map { |r| "#{r.name}_path  #{r.path}" }
+        routes = catalogue.ranked_routes(role_class).reject { |r| r.namespace == "api" }
+        visits = catalogue.learned.route_visits(catalogue.role_key(role_class))
+        labels = routes.map do |r|
+          n = visits[r.name]
+          visited = ""
+          visited = "  (visited in #{n} #{(n == 1) ? "spec" : "specs"})" if n
+          "#{r.name}_path  #{r.path}#{visited}"
+        end
         default = plan.start.route.presence ? labels.find { |l| l.start_with?("#{plan.start.route}_path ") } : labels.first
         choice = choose("Start page", labels, default: default)
         route = routes[labels.index(choice)]
