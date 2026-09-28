@@ -118,6 +118,7 @@ module MagicTest
     #
     #   magic_sign_in(provider.user)
     def magic_sign_in(user)
+      magic_require_cuprite!("magic_sign_in")
       user.ensure_authentication_token if user.respond_to?(:ensure_authentication_token)
       sign_in(user)
       page.driver.set_cookie("auth_token", user.authentication_token) if user.respond_to?(:authentication_token)
@@ -125,6 +126,15 @@ module MagicTest
     end
 
     private
+
+    # B1: without Cuprite (a spec that never called `driven_by :cuprite` in an
+    # app with no default driver) the failure used to be a bare NoMethodError.
+    def magic_require_cuprite!(helper)
+      driver = page.driver
+      return if defined?(Capybara::Cuprite::Driver) && driver.is_a?(Capybara::Cuprite::Driver)
+      raise HelperError, "#{helper} needs Cuprite (got #{driver.class}); add `driven_by :cuprite` to this spec's before block " \
+        "(Studiz sets the driver per spec; the wizard applies MagicTest.config.wizard_driven_by itself)"
+    end
 
     def magic_chosen_underlying_select(from)
       find(:select, from, visible: :all)
