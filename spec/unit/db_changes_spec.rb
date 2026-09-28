@@ -120,5 +120,15 @@ RSpec.describe(MagicTest::DbChanges) do
     it "suggests it after a POST without form params too, by diffing the memoised record" do
       expect(suggestions_for("POST")).to(include("expect(discount.reload.archived).to(eq(true))"))
     end
+
+    it "keeps suggesting it on every rebuild (the toolbar rebuilds from the events on each poll)" do
+      session = FakeSession.new(known_ids: [provider.id.to_s, discount.id.to_s], memoized: {provider: provider, discount: discount})
+      session.request_log.add(archive_request("GET"))
+      events = [ev("click", target: target(tag: "a", text: "Arkiver nu"), candidates: [cand(kind: "link_or_button", locator: "Arkiver nu")])]
+      3.times do
+        _steps, suggestions = session.build(events)
+        expect(suggestions.flat_map(&:lines)).to(include("expect(discount.reload.archived).to(eq(true))"))
+      end
+    end
   end
 end

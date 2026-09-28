@@ -261,8 +261,10 @@ module MagicTest
         RubyLiteral.string(address)
       end
 
+      # B8: any request that changed rows counts, GET included (a rails-ujs
+      # remote link is a GET; Studiz's archive confirm is one).
       def db_suggestions(event)
-        record = @session.request_log.all.reverse.find { |r| !r.get? && r.db_changes.present? }
+        record = @session.request_log.all.reverse.find { |r| r.db_changes.present? }
         return unless record && !@suggested_db_for&.include?(record.id)
         (@suggested_db_for ||= []) << record.id
         record.db_changes.each do |change|
@@ -288,11 +290,15 @@ module MagicTest
         end
       end
 
+      # Reload assertions for the memoised record the request changed: every
+      # attribute whose stored value differs from what the example last saw
+      # (B8: a remote link sends no form params, so the diff is the evidence),
+      # plus the form params that now match.
       def reload_suggestions(record, model, event)
         klass = model.constantize
         param_key = klass.model_name.param_key
         attrs = record.params && (record.params[param_key] || record.params[param_key.to_s])
-        return unless attrs.is_a?(Hash)
+        attrs = {} unless attrs.is_a?(Hash)
         # The record in the request path first (PATCH /udbydere/1/admin/rabatter/2: the
         # member id is the last one, the earlier ones belong to parents); ids in
         # the params are weaker evidence; a lone let of the class is the last resort.
@@ -305,7 +311,16 @@ module MagicTest
           var, rec = same_class.first if same_class.size == 1
         end
         return unless var
+        # Baseline: the values the example started with (RecordRefs snapshots
+        # them when a record is first seen). Every build rebuilds from the
+        # events, so a baseline read from the in-memory record would move after
+        # the first reload and the suggestion would vanish on the next poll.
+        before = (@session.respond_to?(:record_refs) && @session.record_refs.attributes_for(var.to_s)) || (rec.respond_to?(:attributes) ? rec.attributes.dup : {})
         rec.reload
+        changed = rec.attributes.reject { |k, v| before[k] == v || %w[updated_at created_at lock_version].include?(k) || v.nil? }
+        changed.each do |attr, current|
+          suggest(:db_attr, Assertions.reload_attr(var, attr, RubyLiteral.value(current)), "Assert #{var}.#{attr}", event)
+        end
         attrs.each do |attr, value|
           next unless rec.respond_to?(attr) && value.is_a?(String)
           current = rec.public_send(attr)

@@ -36,6 +36,11 @@ module MagicTest
       @records.empty?
     end
 
+    # The attribute values a let had when first seen (nil for an unknown let).
+    def attributes_for(expr)
+      @attributes[expr.to_s]
+    end
+
     # Let expressions whose record has this id ("42" → ["discount"]).
     def lets_for_id(id)
       @by_id[id.to_s]
