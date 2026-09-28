@@ -4,9 +4,15 @@ module MagicTest
     # the lets so parents come first. Returns Issues; errors block preflight,
     # warnings are shown. Every issue carries a suggested fix.
     class Validator
+      # severity: :error blocks; :warning should be read; :hint (B6) is
+      # optional advice shown collapsed ("also name this record").
       Issue = Struct.new(:severity, :field, :message, :fix, :data) do
         def error?
           severity == :error
+        end
+
+        def hint?
+          severity == :hint
         end
 
         def to_h
@@ -48,7 +54,11 @@ module MagicTest
       end
 
       def warnings
-        issues.reject(&:error?)
+        issues.select { |i| i.severity == :warning }
+      end
+
+      def hints
+        issues.select(&:hint?)
       end
 
       def valid?
@@ -60,15 +70,27 @@ module MagicTest
         Ordering.order(plan.models)
       end
 
-      # Fills each unset belongs_to with the one let of a matching class.
+      # Fills each unset belongs_to with the one let of a matching class. B6:
+      # never an optional association to another record of the model's own
+      # class (provider.group_leader → the second provider): that is a choice
+      # the person makes in the association picker ("reuse provider" or "leave
+      # it to the factory").
       def auto_wire!
         plan.models.each do |model|
           catalogue.associations_for(model.factory).each do |assoc|
             next if model.associations.key?(assoc.name)
+            next if optional_self_reference?(model, assoc)
             candidates = candidate_lets(model, assoc)
             model.associations[assoc.name] = candidates.first if candidates.size == 1
           end
         end
+      end
+
+      def optional_self_reference?(model, assoc)
+        return false if assoc.required? || assoc.class_name.blank?
+        klass = catalogue.klass_for(model.factory)
+        target = assoc.class_name.safe_constantize
+        (klass && target) ? klass <= target : catalogue.factory(model.factory)&.class_name == assoc.class_name
       end
 
       def candidate_lets(model, assoc)
@@ -186,17 +208,46 @@ module MagicTest
           end
           assocs.each do |assoc|
             next if model.associations.key?(assoc.name)
+            next if optional_self_reference?(model, assoc)
             candidates = candidate_lets(model, assoc)
             if candidates.size > 1
               add(:warning, "#{field}.#{assoc.name}", "Several lets could be #{assoc.name}: #{candidates.join(", ")}. The factory will build its own.", "pick one", {association: assoc.name, candidates: candidates})
             elsif candidates.empty?
-              parent_let = assoc.class_name.to_s.demodulize.underscore
-              add(:warning, "#{field}.#{assoc.name}", "Missing parent: no let of class #{assoc.class_name || "(polymorphic)"} for #{assoc.name}; the factory will build one that no let refers to.",
-                assoc.class_name ? "add let!(:#{parent_let}) { create(:#{parent_let}) }" : "add a let for it",
-                {association: assoc.name, add_model: ((assoc.class_name && catalogue.factories.find { |f| f.class_name == assoc.class_name }) ? {"let" => parent_let, "factory" => catalogue.factories.find { |f| f.class_name == assoc.class_name }.name} : nil)})
+              report_missing_parent(model, assoc, field)
             end
           end
         end
+      end
+
+      # B6: a parent is surfaced only when it matters. The factory builds it →
+      # a collapsed hint ("also name this record"). NOT NULL and the factory
+      # does not build it → a warning (create would fail). Optional and not
+      # built → nothing, nil is what the factory means.
+      def report_missing_parent(model, assoc, field)
+        builds = catalogue.factory_builds?(model.factory, assoc.name, traits: model.traits)
+        return if !builds && !assoc.required?
+        parent_factory = assoc.class_name && catalogue.factories.find { |f| f.class_name == assoc.class_name }
+        let_name = parent_factory && propose_let_name(model, assoc, parent_factory)
+        add_model = parent_factory ? {"let" => let_name, "factory" => parent_factory.name} : nil
+        if builds
+          add(:hint, "#{field}.#{assoc.name}", "The :#{model.factory} factory builds #{model.let}.#{assoc.name} (a #{assoc.class_name || "record"}) that no let refers to.",
+            add_model ? "also name this record: add let!(:#{let_name}) { create(:#{parent_factory.name}) } and #{model.let} will point at it" : "also name this record: add a let for it",
+            {association: assoc.name, add_model: add_model, optional: true})
+        else
+          add(:warning, "#{field}.#{assoc.name}", "Missing parent: #{model.let}.#{assoc.name} is required (#{assoc.foreign_key} is NOT NULL) and the :#{model.factory} factory does not build one; create(:#{model.factory}) would fail.",
+            add_model ? "add let!(:#{let_name}) { create(:#{parent_factory.name}) }; #{model.let} will point at it" : "add a let of class #{assoc.class_name || "(polymorphic)"}",
+            {association: assoc.name, add_model: add_model})
+        end
+      end
+
+      # A let name for the parent that no existing let already uses.
+      def propose_let_name(model, assoc, parent_factory)
+        taken = plan.models.map(&:let)
+        base = assoc.name.to_s # the belongs_to name reads best: let!(:institution), let!(:zip_code)
+        return base unless taken.include?(base)
+        candidate = "#{model.let}_#{assoc.name}"
+        candidate = "#{candidate}_2" if taken.include?(candidate)
+        candidate
       end
 
       def check_signed_in

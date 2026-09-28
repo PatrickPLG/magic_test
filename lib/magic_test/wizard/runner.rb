@@ -101,6 +101,7 @@ module MagicTest
         validator = validate(plan)
         raise Wizard::Error, "the plan is not valid:\n#{format_issues(validator.errors)}" unless validator.valid?
         puts "magic_test wizard: warnings:\n#{format_issues(validator.warnings)}" if validator.warnings.any?
+        puts "magic_test wizard: hints:\n#{format_issues(validator.hints)}" if validator.hints.any?
         codegen = codegen_for(plan)
         skeleton = codegen.skeleton
         puts "magic_test wizard: skeleton (#{skeleton.mode}) for #{path_for(plan)}:\n#{skeleton.body_lines.map { |l| "    #{l}" }.join("\n")}"

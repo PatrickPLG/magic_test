@@ -68,11 +68,12 @@ RSpec.describe(MagicTest::Wizard::Validator) do
     expect(v2.ordered_models.map(&:let)).to(eq(%w[note provider discount]).or(eq(%w[provider discount note])))
   end
 
-  it "reports a missing parent as a warning with a one-click fix, never adding it silently" do
+  it "reports a parent the factory builds as a hint with a one-click fix, never adding it silently" do
     p = plan("models" => [{"let" => "discount", "factory" => "discount"}], "signed_in" => nil, "start" => {"route" => "root"})
     v = described_class.validate(p, catalogue)
-    issue = v.warnings.find { |i| i.field == "models[0].associations.provider" }
-    expect(issue.message).to(include("Missing parent"))
+    expect(v.warnings).to(be_empty, messages(v).join("\n"))
+    issue = v.hints.find { |i| i.field == "models[0].associations.provider" }
+    expect(issue.message).to(eq("The :discount factory builds discount.provider (a Provider) that no let refers to."))
     expect(issue.data[:add_model]).to(eq({"let" => "provider", "factory" => "provider"}))
     expect(p.model("discount").associations).not_to(have_key("provider"))
     expect(p.models.map(&:let)).to(eq(["discount"]))
@@ -180,7 +181,7 @@ RSpec.describe(MagicTest::Wizard::Validator) do
     it "wires the one let of the parent class and then says nothing" do
       v = described_class.validate(plan("signed_in" => nil, "models" => [{"let" => "invoice", "factory" => "invoice"}, {"let" => "payment", "factory" => "payment"}], "start" => {"route" => "root"}), catalogue)
       expect(v.plan.model("payment").associations).to(eq({"invoice" => "invoice"}))
-      expect(v.issues.map(&:field).grep(/payment|invoice/)).to(eq(["models[0].associations.provider"])) # the invoice's own provider: a hint
+      expect(v.issues.map(&:field)).to(eq(["models[0].associations.provider"])) # only the invoice's own provider, as a hint
       expect(v.hints.map(&:field)).to(eq(["models[0].associations.provider"]))
     end
   end

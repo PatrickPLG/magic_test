@@ -28,6 +28,10 @@ module MagicTest
             say "Warnings:"
             validator.warnings.each { |i| say "  - #{i.field}: #{i.message}#{"  (fix: #{i.fix})" if i.fix}" }
           end
+          if validator.hints.any?
+            say "Hints (optional):"
+            validator.hints.each { |i| say "  - #{i.field}: #{i.message}#{"  (#{i.fix})" if i.fix}" }
+          end
           if validator.errors.any?
             say "The plan is not valid:"
             validator.errors.each { |i| say "  - #{i.field}: #{i.message}#{"  (fix: #{i.fix})" if i.fix}" }

@@ -106,6 +106,29 @@ module MagicTest
         factory(factory_name)&.class_name&.safe_constantize
       end
 
+      # B6: does the factory set this attribute/association itself (in its own
+      # definition, its parent's, or one of the given traits)? Read from
+      # FactoryBot's declarations, never by building anything.
+      def factory_builds?(factory_name, attribute, traits: [])
+        return false unless defined?(FactoryBot)
+        f = FactoryBot.factories.find(factory_name.to_s.to_sym)
+        parent = f.send(:parent) if f.respond_to?(:parent, true)
+        names = declaration_names(f.definition) + declaration_names(parent.respond_to?(:definition) ? parent.definition : nil)
+        all_traits = f.defined_traits.to_a + (parent.respond_to?(:defined_traits) ? parent.defined_traits.to_a : [])
+        Array(traits).each do |t|
+          trait = all_traits.find { |tr| tr.name.to_s == t.to_s }
+          names += declaration_names(trait.definition) if trait.respond_to?(:definition)
+        end
+        names.include?(attribute.to_s)
+      rescue KeyError, ArgumentError, NoMethodError
+        false
+      end
+
+      def declaration_names(definition)
+        return [] unless definition.respond_to?(:declarations)
+        definition.declarations.map { |d| d.name.to_s }
+      end
+
       # `belongs_to` reflections of the factory's class, with NOT NULL info.
       def associations_for(factory_name)
         klass = klass_for(factory_name)

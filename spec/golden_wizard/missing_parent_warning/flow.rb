@@ -1,6 +1,6 @@
-# The event's institution is not a let: the validator warns (with the
-# one-click fix) instead of adding a let silently, and the factory builds the
-# parent. The written spec has exactly the lets the plan named.
+# The event's institution is not a let: the event factory builds it, so the
+# validator offers a hint (with the one-click fix) instead of adding a let
+# silently or warning (B6). The written spec has exactly the lets the plan named.
 MagicTest::Testing::WizardFlow.define("missing_parent_warning") do
   plan <<~YAML
     description: guest reads a published event
@@ -17,7 +17,7 @@ MagicTest::Testing::WizardFlow.define("missing_parent_warning") do
       params:
         id: event
   YAML
-  expect_output(/Missing parent: no let of class Institution for institution.*add let!\(:institution\) \{ create\(:institution\) \}/)
+  expect_output(/hints:.*The :event factory builds event\.institution \(a Institution\) that no let refers to\..*also name this record: add let!\(:institution\) \{ create\(:institution\) \}/m)
 
   script do |h|
     h.select_text("h1")

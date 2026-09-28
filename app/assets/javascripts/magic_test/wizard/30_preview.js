@@ -52,18 +52,30 @@ W.preview = (function () {
     renderChips();
     els.issues.innerHTML = '';
     document.querySelectorAll('.field-error').forEach(function (n) { n.remove(); });
+    // B6: errors stay above the code; warnings and hints fold into a <details>.
+    var folded = [];
     S.issues.forEach(function (issue) {
-      var row = h('div', { class: 'issue ' + issue.severity }, [h('strong', { text: issue.field + ': ' }), issue.message, issue.fix ? h('span', { class: 'fix', text: 'fix: ' + issue.fix }) : null]);
+      var row = h('div', { class: 'issue ' + issue.severity }, [h('strong', { text: issue.field + ': ' }), issue.message, issue.fix ? h('span', { class: 'fix', text: (issue.severity === 'hint' ? '' : 'fix: ') + issue.fix }) : null]);
       if (issue.data && issue.data.add_model) {
         row.appendChild(h('button', { text: 'add let!(:' + issue.data.add_model.let + ')', onclick: function () {
           S.plan.models.push({ let: issue.data.add_model.let, factory: issue.data.add_model.factory, traits: [], count: 1, associations: {}, attributes: {} });
           W.form.render(); schedule();
         } }));
       }
-      els.issues.appendChild(row);
-      var target = document.querySelector('[data-field="' + issue.field + '"]');
-      if (target && issue.severity === 'error') target.appendChild(h('div', { class: 'field-error', text: issue.message }));
+      if (issue.severity === 'error') {
+        els.issues.appendChild(row);
+        var target = document.querySelector('[data-field="' + issue.field + '"]');
+        if (target) target.appendChild(h('div', { class: 'field-error', text: issue.message }));
+      } else {
+        folded.push(row);
+      }
     });
+    if (folded.length) {
+      var warnings = S.issues.filter(function (i) { return i.severity === 'warning'; }).length;
+      var hints = folded.length - warnings;
+      var summary = [warnings ? warnings + (warnings === 1 ? ' warning' : ' warnings') : null, hints ? hints + (hints === 1 ? ' hint' : ' hints') : null].filter(Boolean).join(' · ');
+      els.issues.appendChild(h('details', { id: 'warnings', class: 'warnings' }, [h('summary', { text: summary })].concat(folded)));
+    }
     var changedSincePreflight = !S.preflightedPlan || JSON.stringify(S.preflightedPlan) !== JSON.stringify(S.plan);
     els.preflightBtn.disabled = !(res.ok && S.status !== 'preflighting' && S.status !== 'recording');
     els.startBtn.disabled = !(S.preflight && S.preflight.ok && !changedSincePreflight && S.status === 'preflighted');
