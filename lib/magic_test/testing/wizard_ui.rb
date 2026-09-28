@@ -90,9 +90,20 @@ module MagicTest
         wait_until { page.has_css?("[id^='w-model-'][id$='-let']") }
       end
 
+      def set_count(model_index, n)
+        wait_css("#w-model-#{model_index}-count")
+        ui.click("#w-model-#{model_index}-count").select_all.type(n.to_s)
+      end
+
+      # B3 flows: what the file looks like right before Start (the harness compares against it).
+      def snapshot_target_before_start
+        target = ENV.fetch("MAGIC_TEST_UI_TARGET")
+        File.write(File.join(ENV.fetch("MAGIC_TEST_UI_WORK"), "target_before_start.rb"), File.read(target))
+      end
+
       def set_attribute(model_index, name, value)
         ui.click("#w-model-#{model_index}-attr-add").type(name)
-        ui.press("Enter")
+        ui.press(:enter)
         wait_css("#w-model-#{model_index}-attr-#{name}")
         ui.click("#w-model-#{model_index}-attr-#{name}").type(value)
       end

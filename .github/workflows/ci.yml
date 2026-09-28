@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     env:
       RAILS_ENV: test
       CI: "1"
@@ -59,3 +59,86 @@ jobs:
             tmp/golden/**/*.log
             tmp/golden/**/*_spec.rb
             spec/fixture_app/tmp/screenshots
+
+  # B8 arrived as a Postgres-shaped report: the DB-change and golden suites also run on Postgres.
+  postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      RAILS_ENV: test
+      CI: "1"
+      FIXTURE_APP_ADAPTER: postgresql
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.2"
+          bundler-cache: true
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+      - name: DB-change and codegen unit specs on Postgres
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+        run: bin/rspec spec/unit/db_changes_spec.rb spec/unit/emitter_spec.rb spec/unit/engine_spec.rb spec/unit/wizard
+      - name: Golden flows on Postgres (recorder, wizard and UI flows)
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          MAGIC_TEST: "1"
+          MAGIC_TEST_HEADLESS: "1"
+        run: bin/rspec spec/golden/golden_flows_spec.rb spec/golden_wizard/golden_wizard_spec.rb
+      - name: Upload golden-flow logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-logs-postgres
+          path: |
+            tmp/golden/**/*.log
+            tmp/golden_wizard/**/*.log
+
+  # Studiz registers no default Capybara driver (every spec calls driven_by :cuprite): the wizard must work like that too (B1).
+  studiz-mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      RAILS_ENV: test
+      CI: "1"
+      FIXTURE_STUDIZ_MIRROR: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2.2"
+          bundler-cache: true
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+        with:
+          chrome-version: stable
+      - name: Wizard specs and wizard golden flows without a default driver
+        env:
+          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
+          MAGIC_TEST: "1"
+          MAGIC_TEST_HEADLESS: "1"
+        run: bin/rspec spec/recorder/wizard_driver_spec.rb spec/recorder/wizard_preflight_spec.rb spec/recorder/wizard_tui_spec.rb spec/recorder/wizard_browser_spec.rb spec/golden_wizard/golden_wizard_spec.rb
+      - name: Upload golden-flow logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-logs-mirror
+          path: |
+            tmp/golden_wizard/**/*.log
+            tmp/wizard_ui/*.log

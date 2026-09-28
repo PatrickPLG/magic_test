@@ -135,6 +135,10 @@ module MagicTest
         end
         logs = []
         if ui_block
+          if template_run && defined?(Rails) # a fresh template each run
+            require "magic_test/wizard/templates"
+            FileUtils.rm_f(MagicTest::Wizard::Templates.path(template_run[:name], Rails.root))
+          end
           out, status = record_ui(root)
           logs << out
           if start_failure_pattern
@@ -180,6 +184,8 @@ module MagicTest
       private
 
       def target_changed_after_failure?(root)
+        snapshot = File.join(work_dir(root), "target_before_start.rb")
+        return File.read(target_path(root)) != File.read(snapshot) if File.exist?(snapshot)
         return File.exist?(target_path(root)) unless existing_fixture
         File.read(target_path(root)) != File.read(File.join(root, "spec/fixtures/wizard", existing_fixture))
       end

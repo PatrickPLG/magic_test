@@ -9,3 +9,6 @@
 /spec/fixture_app/db/*.sqlite3-*
 /spec/fixture_app/log/
 /spec/fixture_app/tmp/
+
+# templates saved by golden UI flows
+spec/fixture_app/spec/magic_test/templates/
