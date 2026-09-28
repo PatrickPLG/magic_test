@@ -5,36 +5,65 @@
 <title>magic_test · new system test</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --bg: #f3f4f6; --panel: #fff; --line: #c9ced6; --ink: #1c1f23; --muted: #6b7280; --head: #1f2937; --blue: #2563eb; --amber: #d97706; --red: #dc2626; --green: #16a34a; }
+  :root { --bg: #f3f4f6; --panel: #fff; --line: #c9ced6; --ink: #1c1f23; --muted: #6b7280; --head: #1f2937; --blue: #2563eb; --amber: #d97706; --red: #dc2626; --green: #16a34a; --header-h: 40px; --footer-h: 46px; }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
-  header.top { background: var(--head); color: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; }
-  header.top .title { font-weight: 600; }
-  header.top .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--blue); }
+  body { margin: 0; font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); overflow: hidden; }
+  header.top { height: var(--header-h); background: var(--head); color: #fff; padding: 0 14px; display: flex; align-items: center; gap: 14px; }
+  header.top .title { font-weight: 600; white-space: nowrap; }
+  header.top .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--blue); margin-left: auto; }
   header.top .status.err { background: var(--red); }
   header.top .status.ok { background: var(--green); }
-  main { display: grid; grid-template-columns: 560px 1fr; gap: 12px; padding: 12px; height: calc(100vh - 38px); }
-  .col { overflow: auto; }
+  ol.steps { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
+  ol.steps li { font-size: 12px; color: #cbd5e1; padding: 3px 10px; border-radius: 12px; cursor: pointer; white-space: nowrap; }
+  ol.steps li .n { display: inline-block; width: 16px; height: 16px; line-height: 16px; text-align: center; border-radius: 50%; background: #4b5563; color: #fff; font-size: 10px; margin-right: 5px; }
+  ol.steps li.current { background: #374151; color: #fff; }
+  ol.steps li.current .n { background: var(--blue); }
+  ol.steps li.done .n { background: var(--green); }
+  main { display: grid; grid-template-columns: 560px 1fr; gap: 12px; padding: 12px; height: calc(100vh - var(--header-h) - var(--footer-h)); }
+  .col { overflow: auto; min-width: 0; }
   section.step { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
-  section.step h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  section.step h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  section.step h3 { margin: 10px 0 4px; font-size: 13px; }
   .field { display: block; margin: 6px 0; }
   .field .lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  .field .lbl .hint { vertical-align: middle; }
   input[type=text], input[type=number], input[type=datetime-local], select, textarea { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; width: 100%; background: #fff; }
+  input::placeholder { color: #9ca3af; font-style: italic; }
   select[multiple], select[size] { height: auto; }
   .row { display: flex; gap: 8px; align-items: flex-end; }
   .row > * { flex: 1; }
   .picker input { margin-bottom: 4px; }
   .picker select { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .picker .count { font-size: 11px; color: var(--muted); margin-top: 2px; }
   button { font: inherit; padding: 4px 10px; border-radius: 4px; border: 1px solid #9aa3af; background: #f3f4f6; color: #111; cursor: pointer; }
   button.primary { background: var(--blue); color: #fff; border-color: #1d4ed8; }
   button.danger { background: #fff; color: var(--red); border-color: var(--red); }
   button[disabled] { opacity: .5; cursor: default; }
+  button.hint { width: 16px; height: 16px; padding: 0; line-height: 14px; border-radius: 50%; font-size: 10px; border: 1px solid #9aa3af; background: #fff; color: #374151; margin-left: 4px; vertical-align: middle; }
+  button.hint:focus, button.hint:hover { background: var(--blue); color: #fff; border-color: var(--blue); outline: none; }
+  .popover { position: fixed; z-index: 50; max-width: 360px; background: #111827; color: #e5e7eb; border-radius: 6px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  .popover .when { color: #9ca3af; margin-top: 4px; }
+  .popover pre { margin: 6px 0 0; font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0f172a; padding: 6px; border-radius: 4px; white-space: pre-wrap; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: 8px; cursor: pointer; background: #fff; text-align: left; font: inherit; }
+  .card:hover, .card:focus { border-color: var(--blue); outline: none; }
+  .card.selected { border-color: var(--blue); background: #eff6ff; }
+  .card .name { font-weight: 600; display: block; }
+  .card .meta { font-size: 11px; color: var(--muted); display: block; margin-top: 2px; }
+  .card .tag { display: inline-block; font-size: 10px; padding: 0 6px; border-radius: 8px; margin-top: 4px; }
+  .card .tag.ok { background: #dcfce7; color: #166534; }
+  .card .tag.failed { background: #fee2e2; color: #991b1b; }
+  .card .tag.unknown { background: #f3f4f6; color: var(--muted); }
+  .choice { display: flex; gap: 6px; margin: 4px 0; }
+  .choice button { flex: 1; }
+  .choice button.on { background: #eff6ff; border-color: var(--blue); color: #1d4ed8; }
   .model { border: 1px dashed var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; }
   .model h3 { margin: 0 0 4px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
   .traits label.trait-option { display: flex; align-items: center; gap: 6px; width: 100%; padding: 3px 6px; margin: 1px 0; border-radius: 4px; font-size: 12px; cursor: pointer; }
   .traits label.trait-option:hover { background: #eef2ff; }
   .traits label.trait-option input { margin: 0; }
-  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; min-height: 0; }
+  .traits label.trait-option .usage { margin-left: auto; font-size: 10px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
   .chip { display: inline-flex; align-items: center; gap: 4px; font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #e0e7ff; color: #3730a3; border-radius: 10px; padding: 1px 4px 1px 8px; }
   .chip .chip-remove { font: inherit; line-height: 1; padding: 0 4px; border: 0; background: transparent; color: inherit; cursor: pointer; border-radius: 8px; }
   .chip .chip-remove:hover { background: #c7d2fe; }
@@ -50,43 +79,50 @@
   .issue button { font-size: 11px; padding: 1px 6px; margin-left: 6px; }
   .field-error { color: var(--red); font-size: 11px; }
   pre.code { font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; white-space: pre; overflow: auto; min-height: 200px; margin: 0; }
+  pre.code .ins { background: #14532d; color: #dcfce7; display: block; }
+  pre.code .ctx { color: #94a3b8; display: block; }
   .preflight { margin-top: 10px; }
   .preflight img { max-width: 100%; border: 1px solid var(--line); border-radius: 4px; margin-top: 6px; }
   .preflight .ok { color: var(--green); font-weight: 600; }
   .preflight .fail { color: var(--red); font-weight: 600; }
   .actions { display: flex; gap: 8px; margin: 10px 0; align-items: center; }
+  footer.nav { position: fixed; left: 0; right: 0; bottom: 0; height: var(--footer-h); background: var(--panel); border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 14px; }
+  footer.nav .spacer { flex: 1; }
   .muted { color: var(--muted); font-size: 11px; }
+  .kbd { font: 10px ui-monospace, monospace; background: #e5e7eb; border-radius: 3px; padding: 0 4px; }
   #recording-status { max-width: 720px; margin: 24px auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
   #recording-status h2 { margin: 0 0 8px; font-size: 16px; }
   #recording-status .count { font-size: 28px; font-weight: 600; margin: 8px 0; }
   #recording-status .path { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
-  .kbd { font: 10px ui-monospace, monospace; background: #e5e7eb; border-radius: 3px; padding: 0 4px; }
-  .notice { padding: 6px 10px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 4px; margin-bottom: 8px; }
-  .notice.error { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .notice { padding: 6px 10px; border-radius: 4px; background: #eff6ff; color: #1e3a8a; margin-bottom: 8px; }
+  .notice.error { background: #fef2f2; color: #991b1b; }
   .hidden { display: none; }
 </style>
 </head>
 <body>
-<header class="top"><span class="title">magic_test __VERSION__ · new system test</span><span id="status" class="status">planning</span><span class="muted" style="color:#cbd5e1">Fill in the left column; the right column shows the spec the wizard will write. Nothing is written before preflight passes.</span></header>
+<header class="top"><span class="title">magic_test __VERSION__ · new system test</span><ol id="steps" class="steps" aria-label="steps"></ol><span id="status" class="status">planning</span></header>
 <main>
   <div class="col" id="form"><p class="muted">Loading the catalogue…</p></div>
-  <div class="col">
+  <div class="col" id="side">
     <section class="step">
-      <h2>Skeleton (live preview)</h2>
+      <h2>Skeleton (live preview) <span class="muted" id="path"></span></h2>
       <div id="notice" class="notice hidden"></div>
       <div id="issues"></div>
       <div id="chips" class="chips" aria-label="chosen traits"></div>
       <pre class="code" id="preview">…</pre>
-      <div class="actions">
-        <button id="preflight" class="primary" disabled>Run preflight</button>
-        <button id="start" class="primary" disabled>Start recording</button>
-        <button id="cancel" class="danger">Cancel</button>
-        <span class="muted" id="path"></span>
-      </div>
       <div class="preflight" id="preflight-result"></div>
     </section>
   </div>
 </main>
+<footer class="nav">
+  <button id="cancel" class="danger" title="Close the wizard; nothing has been written">Cancel</button>
+  <span class="muted" id="nav-hint"><span class="kbd">Enter</span> next · <span class="kbd">Esc</span> closes a hint</span>
+  <span class="spacer"></span>
+  <button id="back">Back</button>
+  <button id="next" class="primary">Next</button>
+  <button id="preflight" class="primary hidden">Run preflight</button>
+  <button id="start" class="primary hidden">Start recording</button>
+</footer>
 <script src="/__magic_test/wizard.js" defer></script>
 </body>
 </html>

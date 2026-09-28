@@ -1,0 +1,226 @@
+# Hints shown as "?" popovers in the wizard and the recorder toolbar (1.2 §6).
+# Each hint: one plain sentence (text), when to use it (when), a 1-3 line Ruby
+# example (example). The gem's tests check every key the UI refers to exists
+# and every hint has all three parts.
+wizard:
+  description:
+    text: "The description becomes the it name and a comment, so write what the person does."
+    when: "Always; start with the role and a verb: provider edits a discount."
+    example: |
+      it 'provider edits a discount' do
+  target_new_file:
+    text: "A new file gets the whole skeleton: require, describe, lets, before and the example."
+    when: "When no spec covers this page yet, or the existing one has a different setup."
+    example: |
+      RSpec.describe('Provider edits a discount', :js, type: :system) do
+  target_append:
+    text: "Appending adds one example to an existing describe or context and reuses its lets and sign-in."
+    when: "When a spec for this page exists and its setup fits; pick the block from the tree."
+    example: |
+      context 'Form operations' do
+        it 'provider renames a discount' do   # added here
+  let_bang:
+    text: "let! creates the record before every example, so the page can show it on the first visit."
+    when: "For every record the start page must already show; plain let would create it lazily."
+    example: |
+      let!(:provider) { create(:provider, :with_cvr) }
+  factory:
+    text: "A factory builds one record with sensible defaults; the name is the model in snake_case."
+    when: "Pick the factory of the record the test needs; the role's factory is chosen for you."
+    example: |
+      create(:discount)
+      create(:institutions_student_organisation)
+  trait:
+    text: "A trait is a named variation of a factory: extra attributes or associations the plain factory leaves out."
+    when: "Tick the traits your specs use most (shown as 'used in N specs'); a record that fails validation needs one."
+    example: |
+      create(:provider, :with_cvr)
+      create(:institution, :with_user, :with_specialities)
+  count:
+    text: "A count above one writes create_list and gives you an array let."
+    when: "For lists, pagination and 'the second row' cases."
+    example: |
+      let!(:leads) { create_list(:lead, 3, :contacted) }
+      leads[1].name
+  association:
+    text: "An association points a record at another let, so both appear in the same page and the ids match."
+    when: "Whenever a record belongs to the signed-in role or to another record in the plan."
+    example: |
+      let!(:discount) { create(:discount, :active, provider: provider) }
+  attribute_override:
+    text: "An override sets one attribute to a value the test needs to see or type."
+    when: "When the assertion needs a known text (a name, a title); otherwise keep the factory's defaults."
+    example: |
+      create(:discount, provider: provider, name_da: 'Kaffe 20%')
+  signed_in_role:
+    text: "The signed-in role decides whose pages the test opens; the wizard signs in with that record's user."
+    when: "Pick the role that would use the page; choose guest for public pages."
+    example: |
+      magic_sign_in(provider.user)
+  magic_sign_in:
+    text: "magic_sign_in logs the Devise user in and sets the cookies Studiz's helpers set, without a login form."
+    when: "In the before block, once, with the role's user."
+    example: |
+      before { magic_sign_in(provider.user) }
+  start_page:
+    text: "The start page is the first visit; the recorder takes over from there."
+    when: "Pick the route the role would open; the pages your specs visit most come first."
+    example: |
+      visit(provider_admin_discounts_path(provider))
+  route_params:
+    text: "Each :param of the route takes a let, so the path uses that record's id."
+    when: "Nested routes: provider_id is the provider let, id is the record the page shows."
+    example: |
+      visit(edit_provider_admin_discount_path(provider, discount))
+  preflight:
+    text: "Preflight runs the plan for real: creates the records, signs in and opens the start page in a second window."
+    when: "Before recording, every time the plan changes; nothing is written until it passes."
+    example: |
+      # preflight passed: 200 /udbydere/1/admin/rabatter (2 records, signed in as provider.user)
+  flipper_global:
+    text: "Enabling a flag globally turns the feature on for everyone in this test."
+    when: "When the page behind a feature flag is what you test and the actor does not matter."
+    example: |
+      before { Flipper.enable(:new_discount_page) }
+  flipper_actor:
+    text: "Enabling a flag for an actor turns the feature on for that user only, like a rollout."
+    when: "When the feature is per user or per provider in production."
+    example: |
+      before { Flipper.enable_actor(:new_discount_page, provider.user) }
+  travel_to:
+    text: "travel_to freezes the clock so dates in the page and in assertions are stable."
+    when: "Pages that show 'today', deadlines, or anything relative to now."
+    example: |
+      before { travel_to(Time.zone.parse('2026-12-24 10:00')) }
+  locale:
+    text: "The locale picks the route prefix and the translations the test reads."
+    when: "Studiz serves Danish unprefixed and English under /en; test the one the page is for."
+    example: |
+      visit(provider_admin_discounts_en_path(provider))
+  viewport:
+    text: "The viewport sets the window size, so a mobile layout gets its own menu and columns."
+    when: "When the page has a mobile navigation or responsive tables you need to click."
+    example: |
+      before { page.driver.resize(390, 844) }
+  sidekiq_inline:
+    text: "Sidekiq inline runs jobs as soon as they are enqueued, so their effects show in the page."
+    when: "When the flow enqueues a job whose result you assert (an email, a status change)."
+    example: |
+      Sidekiq::Testing.inline! do
+        click_on('Send påmindelse')
+      end
+  mail_assertion:
+    text: "Mail assertions check what was delivered: count, recipient, subject."
+    when: "When the flow sends an email; the recorder suggests the exact expectation."
+    example: |
+      expect(ActionMailer::Base.deliveries.last.to).to(eq([provider.user.email]))
+  fixture_file:
+    text: "A fixture file is uploaded by the test from spec/fixtures/files."
+    when: "Forms with a file field; tick the file the recorder should attach."
+    example: |
+      magic_attach_image('Vælg billede', Rails.root.join('spec/fixtures/files/cover.png'))
+  starters:
+    text: "A starter is a known-good setup for one role: records, traits and a start page that preflight has passed before."
+    when: "Start from one when you test a page for that role; adjust, then preflight."
+    example: |
+      # Provider with an active discount → create(:provider, :with_cvr), create(:discount, :active, provider: provider)
+  templates:
+    text: "A template is a plan you saved; it keeps records, role and start page for the next test."
+    when: "Save one after a plan passed preflight and you expect more tests with the same setup."
+    example: |
+      bin/magic new --template provider_discounts "provider deletes a discount"
+  append_vs_context:
+    text: "A new context wraps the example with its own lets and before when the block lacks something."
+    when: "Automatic: the wizard appends a bare example when everything is there, else opens a context."
+    example: |
+      context 'when signed in as a provider' do
+        let!(:provider) { create(:provider, :with_cvr) }
+toolbar:
+  have_content:
+    text: "have_content waits for the text to appear anywhere on the page."
+    when: "After a save or a navigation, for the flash or the heading."
+    example: |
+      expect(page).to(have_content(I18n.t('discounts.update.success')))
+  have_no_content:
+    text: "have_no_content waits until the text is gone, so it never passes early like not_to have_content can."
+    when: "After deleting or archiving something that was on the page."
+    example: |
+      expect(page).to(have_no_content(discount.name_da))
+  have_css:
+    text: "have_css checks that an element matches; text:, count: and visible: narrow it."
+    when: "For rows, cards and badges the text alone does not identify."
+    example: |
+      expect(page).to(have_css('.deal', count: 2))
+      expect(page).to(have_css('#full-view-modal', visible: true))
+  have_no_css:
+    text: "have_no_css waits until no element matches; use it for closed modals and removed rows."
+    when: "After closing a dialog or removing a card."
+    example: |
+      expect(page).to(have_no_css('#ajax-modal.show'))
+  have_field:
+    text: "have_field checks a form field, optionally its value with with:."
+    when: "After a form loaded or was filled."
+    example: |
+      expect(page).to(have_field('Navn', with: 'Kaffe 25%'))
+  have_checked_field:
+    text: "have_checked_field and have_unchecked_field check a checkbox or radio state by label."
+    when: "After ticking or clearing a checkbox."
+    example: |
+      expect(page).to(have_checked_field('Nyhedsbrev'))
+  have_select:
+    text: "have_select checks a select's chosen option with selected:."
+    when: "After choosing an option, including through Chosen."
+    example: |
+      expect(page).to(have_select('Status', selected: 'Aktiv'))
+  have_button:
+    text: "have_button finds a button by text; disabled: true checks it cannot be clicked."
+    when: "For submit buttons that enable after validation."
+    example: |
+      expect(page).to(have_button('Gem', disabled: true))
+  have_link:
+    text: "have_link finds a link by text; href: checks where it goes."
+    when: "For navigation the test does not follow."
+    example: |
+      expect(page).to(have_link('Se faktura', href: invoice_path(invoice)))
+  have_current_path:
+    text: "have_current_path waits for the URL, so it survives redirects."
+    when: "After a save that redirects."
+    example: |
+      expect(page).to(have_current_path(provider_admin_discounts_path(provider)))
+  modal_closed:
+    text: "A closed modal is asserted with have_no_css on its .show class, which waits for the fade."
+    when: "After confirming or cancelling a dialog."
+    example: |
+      expect(page).to(have_no_css('#ajax-modal.show'))
+  toast:
+    text: "A toast is asserted like any text with have_content; it is checked while it is still visible."
+    when: "Right after the action that shows it."
+    example: |
+      expect(page).to(have_content(I18n.t('discounts.show.archived_toast')))
+  change_count:
+    text: "A count expectation checks how many records exist after the step; the block form checks the change itself."
+    when: "After creating or deleting records."
+    example: |
+      expect(Discount.count).to(eq(2))
+      expect { click_on('Slet') }.to(change(Discount, :count).by(-1))
+  reload_attr:
+    text: "reload re-reads the record from the database, so the expectation sees what the request saved."
+    when: "After a form submit or a remote link that changes a record."
+    example: |
+      expect(discount.reload.name_da).to(eq('Kaffe 25%'))
+  confidence:
+    text: "Green is a verified unique semantic locator, amber a scoped or CSS one, red needs your review."
+    when: "Read amber and red before saving; pick another locator or add a stable id."
+    example: |
+      # green: click_on(I18n.t('discounts.index.edit'))
+      # amber: within("#discount-card-#{discount.id}") { find('div.card-body').click }
+  why_locator:
+    text: "The recorder ranks every candidate that matches exactly one element: label and text first, then ids and names, then scoped and CSS."
+    when: "Open it when a locator looks odd; the list says why each alternative lost."
+    example: |
+      # chosen: click_on(discount.name_da)   alternatives: a.discount-name-link (CSS), positional (never first)
+  review_comment:
+    text: "A REVIEW comment marks a line the recorder is not sure about; fix it before you commit the spec."
+    when: "When a locator matched several elements or contains factory data."
+    example: |
+      # magic_test: REVIEW the text contains factory data (discount.name_da); prefer a stable id

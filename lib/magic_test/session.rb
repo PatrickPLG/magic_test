@@ -12,6 +12,7 @@ require "magic_test/console"
 require "magic_test/scripted_session"
 
 require "magic_test/record_refs"
+require "magic_test/hints"
 
 module MagicTest
   # One recording session: the server-side source of truth for events,
@@ -172,6 +173,7 @@ module MagicTest
         "ignored_paths" => config.ignored_request_paths.map(&:source),
         "poll_interval_ms" => config.poll_interval_ms, "max_ancestor_depth" => config.max_ancestor_depth,
         "call_site" => call_site.to_h, "i18n_keys" => @i18n_keys, "mode" => @mode,
+        "hints" => Hints.payload("toolbar"),
         # A scripted human never looks at the panel, and it would cover page
         # elements a person would simply drag it away from.
         "toolbar" => ENV["MAGIC_TEST_SCRIPT"].blank? || ENV["MAGIC_TEST_TOOLBAR"].present?

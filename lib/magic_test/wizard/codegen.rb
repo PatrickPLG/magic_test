@@ -109,7 +109,8 @@ module MagicTest
       end
 
       def it_lines
-        inner = ["visit(#{start_expression})", "magic_test"]
+        visit = plan.start.route.to_s.empty? ? "visit('/') # TODO: pick the start page (step 3)" : "visit(#{start_expression})"
+        inner = [visit, "magic_test"]
         if plan.extras.sidekiq_inline
           ["Sidekiq::Testing.inline! do"] + inner.map { |l| "  #{l}" } + ["end"]
         else
@@ -170,7 +171,7 @@ module MagicTest
 
       # The `it` block as unindented lines.
       def example_lines
-        ["it #{RubyLiteral.string(plan.description)} do"] + indent(it_lines) + ["end"]
+        ["it #{RubyLiteral.string(plan.description.to_s.strip.empty? ? "TODO: describe the test" : plan.description)} do"] + indent(it_lines) + ["end"]
       end
 
       def before_block
@@ -179,7 +180,8 @@ module MagicTest
       end
 
       def new_file_source
-        lines = ["require 'rails_helper'", "", "# #{plan.description}", "RSpec.describe(#{RubyLiteral.string(plan.description.sub(/\A[a-z]/, &:upcase))}, :js, type: :system) do"]
+        title = plan.description.to_s.strip.empty? ? "TODO: describe the test" : plan.description
+        lines = ["require 'rails_helper'", "", "# #{title}", "RSpec.describe(#{RubyLiteral.string(title.sub(/\A[a-z]/, &:upcase))}, :js, type: :system) do"]
         lines += indent(let_lines)
         lines << "" if let_lines.any?
         lines += indent(before_block)
