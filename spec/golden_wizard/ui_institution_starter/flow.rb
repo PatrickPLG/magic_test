@@ -26,7 +26,10 @@ MagicTest::Testing::WizardFlow.define("ui_institution_starter") do
     h.click("#events_event_starts_at").type("24/09-2026 14:00").press(:tab)
     page.has_no_css?(".flatpickr-calendar.open") # the calendar can cover the terms label at other window sizes (the Studiz mirror runs at Rails' 1400×1400)
     h.click("label", text: "Jeg accepterer Studiz' vilkår")
-    raise "the terms checkbox did not toggle" unless page.find("#events_event_terms_accepted", visible: :all).checked?
+    unless page.find("#events_event_terms_accepted", visible: :all).checked?
+      page.save_screenshot(File.join(ENV.fetch("MAGIC_TEST_UI_WORK", "tmp"), "terms_not_toggled.png"))
+      raise "the terms checkbox did not toggle (see terms_not_toggled.png)"
+    end
     h.click_on("Arrangør")
     h.click("#events_event_account_number").type("1234567890")
     h.click_on("Gem arrangement")
