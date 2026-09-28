@@ -23,6 +23,7 @@
   .col { overflow: auto; min-width: 0; }
   section.step { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
   section.step h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  section.step h2 .muted { text-transform: none; letter-spacing: 0; font-weight: normal; word-break: break-all; }
   section.step h3 { margin: 10px 0 4px; font-size: 13px; }
   .field { display: block; margin: 6px 0; }
   .field .lbl { display: block; font-size: 11px; color: var(--muted); margin-bottom: 2px; }
@@ -90,13 +91,13 @@
   footer.nav .spacer { flex: 1; }
   .muted { color: var(--muted); font-size: 11px; }
   .kbd { font: 10px ui-monospace, monospace; background: #e5e7eb; border-radius: 3px; padding: 0 4px; }
-  #recording-status { max-width: 720px; margin: 24px auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; }
+  #recording-status { grid-column: 1 / -1; max-width: 720px; width: 100%; margin: 24px auto; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; align-self: start; }
   #recording-status h2 { margin: 0 0 8px; font-size: 16px; }
   #recording-status .count { font-size: 28px; font-weight: 600; margin: 8px 0; }
   #recording-status .path { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
   .notice { padding: 6px 10px; border-radius: 4px; background: #eff6ff; color: #1e3a8a; margin-bottom: 8px; }
   .notice.error { background: #fef2f2; color: #991b1b; }
-  .hidden { display: none; }
+  .hidden, footer.nav.hidden { display: none; }
 </style>
 </head>
 <body>

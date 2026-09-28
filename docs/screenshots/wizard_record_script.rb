@@ -1,12 +1,11 @@
-# After the wizard hands over: the recording window with the toolbar and one
-# step, then the wizard window's status screen (1.2, B9); one screenshot each.
+# After the wizard hands over: one step in the recording window, then a
+# screenshot of the wizard window's status screen (1.2, B9).
 dir = ENV.fetch("MAGIC_TEST_SCREENSHOT_DIR")
 h = human
 recording_window = page.current_window
 settle(1.0)
 h.click_on("Rediger")
 settle(1.0)
-page.save_screenshot(File.join(dir, "wizard-recording-window.png"))
 wizard_window = (page.windows - [recording_window]).first
 if wizard_window
   page.within_window(wizard_window) do
