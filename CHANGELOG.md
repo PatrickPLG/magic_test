@@ -37,6 +37,9 @@ Bugs found on Studiz (each with a regression test written first):
   the DB-change and golden suites.
 - B9: after Start the wizard window becomes a status screen (file, live step
   count, bring-to-front, Save / Save & finish) instead of closing.
+- Preflight waits for the start page's JavaScript context (Capybara's wait
+  time, then one reload) instead of reporting Ferrum's "There's no context
+  available" as a failure of the page.
 
 Guided UX:
 

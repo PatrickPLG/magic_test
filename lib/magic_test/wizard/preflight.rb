@@ -240,6 +240,7 @@ module MagicTest
         end
         context.visit(expected)
         page = context.page
+        wait_for_page(page, expected)
         status = begin
           page.status_code
         rescue NotImplementedError, NoMethodError
@@ -276,6 +277,25 @@ module MagicTest
         raise e if e.is_a?(SystemExit) || e.is_a?(Interrupt)
         failures << classify(e, "visit", "start.route", expr)
         {}
+      end
+
+      # A window Chrome has just opened can finish the navigation before Ferrum
+      # knows the frame's new JavaScript context (seen in CI under load); Ferrum
+      # itself retries for only 0.6 s and every read of the page then raises
+      # "There's no context available". Wait for the context the Capybara way,
+      # and if it never arrives load the page once more, as a person would.
+      def wait_for_page(page, expected)
+        return unless defined?(Ferrum::NoExecutionContextError)
+        reloaded = false
+        loop do
+          page.document.synchronize(Capybara.default_max_wait_time, errors: [Ferrum::NoExecutionContextError]) { page.evaluate_script("document.readyState") }
+          return
+        rescue Ferrum::NoExecutionContextError
+          raise if reloaded
+          reloaded = true
+          MagicTest.logger.warn("magic_test wizard: #{expected} had no JavaScript context after the visit; loading it again")
+          context.visit(expected)
+        end
       end
 
       # ":institution_id is provider, a Provider" when a param's name and the let's class disagree.
