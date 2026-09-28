@@ -13,12 +13,12 @@ RSpec.describe("Browser wizard", :recorder, type: :system) do
     FileUtils.rm_rf(work)
   end
 
-  def run_wizard(script, target:, db:)
+  def run_wizard(script, target:, db:, record_script: "record_script.rb")
     FileUtils.mkdir_p(File.dirname(target))
     env = {
       "MAGIC_TEST" => "1", "MAGIC_TEST_HEADLESS" => "1", "MAGIC_TEST_WIZARD" => "browser",
       "MAGIC_TEST_WIZARD_SCRIPT" => File.join(root, "spec/fixtures/wizard/ui", script),
-      "MAGIC_TEST_SCRIPT" => File.join(root, "spec/fixtures/wizard/ui/record_script.rb"),
+      "MAGIC_TEST_SCRIPT" => File.join(root, "spec/fixtures/wizard/ui", record_script),
       "MAGIC_TEST_UI_TARGET" => target, "MAGIC_TEST_WIZARD_TARGET" => target,
       "FIXTURE_APP_DB" => File.join(work, db), "RAILS_ENV" => "test"
     }
@@ -63,5 +63,18 @@ RSpec.describe("Browser wizard", :recorder, type: :system) do
   it "toggles a trait from its label text or its row, exactly one, and shows removable chips" do
     out, = run_wizard("trait_rows_script.rb", target: File.join(work, "spec/system/provider/traits_spec.rb"), db: "traits.sqlite3")
     expect(out).to(include("B5 OK: label text and row toggle exactly one trait; chips add and remove"), out.lines.grep(/script failed|B5|Error/).join)
+  end
+
+  # B9 (1.2): after Start the wizard page only said "recording". It must stay
+  # open as a status screen: where the recording runs, what file it writes,
+  # a live step count, and Save / Save & finish that act on the recording.
+  it "keeps the wizard window as a status screen that mirrors the recording" do
+    target = File.join(work, "spec/system/provider/status_spec.rb")
+    out, status = run_wizard("new_file_script.rb", target: target, db: "status.sqlite3", record_script: "status_screen_record_script.rb")
+    expect(out).to(include("B9 OK: status screen shows the file, the live step count and finishes the recording"), out.lines.grep(/script|B9|Error|error/).first(12).join)
+    expect(status.success?).to(be(true), out.lines.last(40).join)
+    written = File.read(target)
+    expect(written).to(include("click_on(I18n.t('discounts.index.edit'))"))
+    expect(written.lines.map(&:strip)).not_to(include("magic_test")) # Save & finish from the status screen ended the session
   end
 end
