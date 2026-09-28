@@ -19,11 +19,11 @@ module MagicTest
   # spec's main thread on the command queue until the toolbar (or a scripted
   # human) finishes the session.
   class Session
-    MAIN_THREAD_COMMANDS = %w[save save_and_finish finish replay_pending open_console abort].freeze
+    MAIN_THREAD_COMMANDS = %w[save save_and_finish finish replay_pending open_console abort front].freeze
 
     Command = Struct.new(:name, :params, :result_queue)
 
-    attr_reader :id, :call_site, :page, :event_log, :request_log, :status, :example, :messages, :writer, :context
+    attr_reader :id, :call_site, :page, :event_log, :request_log, :status, :example, :messages, :writer, :context, :saved_step_count
 
     def self.run(page:, call_site:, example: nil, context: nil)
       session = new(page: page, call_site: call_site, example: example, context: context)
@@ -319,6 +319,7 @@ module MagicTest
         finish!
         {ok: true}
       when "replay_pending" then replay_pending
+      when "front" then bring_to_front # B9: the wizard's status screen asks for the recording window
       when "open_console"
         opened = Console.open(binding)
         opened ? {ok: true, message: "console closed"} : {ok: false, error: "Pry is not available in this process"}
@@ -327,6 +328,15 @@ module MagicTest
       end
     rescue => e
       {ok: false, error: "#{e.class}: #{e.message}"}
+    end
+
+    # Ferrum 0.15 has no bring_to_front; activate the recording window's target over CDP.
+    def bring_to_front
+      browser = page.driver.browser
+      browser.command("Target.activateTarget", targetId: browser.page.target_id)
+      {ok: true}
+    rescue => e
+      {ok: false, error: "bring to front failed: #{e.message}"}
     end
 
     def finish!

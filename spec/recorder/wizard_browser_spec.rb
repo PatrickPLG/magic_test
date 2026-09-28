@@ -75,6 +75,6 @@ RSpec.describe("Browser wizard", :recorder, type: :system) do
     expect(status.success?).to(be(true), out.lines.last(40).join)
     written = File.read(target)
     expect(written).to(include("click_on(I18n.t('discounts.index.edit'))"))
-    expect(written.lines.map(&:strip)).not_to(include("magic_test")) # Save & finish from the status screen ended the session
+    expect(out).to(include("session finished (1 step(s), 1 saved)")) # Save & finish from the status screen ended the session
   end
 end

@@ -155,9 +155,57 @@ W.preview = (function () {
     W.api.post('start', { plan: S.plan }).then(function (res) {
       if (!res.ok) { notice(res.error || 'could not start', true); els.startBtn.disabled = false; return; }
       S.status = 'recording';
-      notice('Skeleton written to ' + res.call_site.path + ':' + res.call_site.line + '. Recording started in the other window; this one closes.');
       setStatus('recording', 'ok');
+      showRecordingStatus(res.call_site);
     });
+  }
+
+  // B9: this window becomes the status screen of the recording that runs in
+  // the other window: where it is, what it writes, a live step count, and
+  // Save / Save & finish that act on the recorder (same endpoints as its toolbar).
+  function recorderCommand(name) {
+    return fetch('/__magic_test/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ command: name }) })
+      .then(function (r) { return r.json(); });
+  }
+
+  function showRecordingStatus(callSite) {
+    var main = document.querySelector('main');
+    main.innerHTML = '';
+    var count = h('div', { class: 'count', id: 'recording-count', text: '0 steps' });
+    var pending = h('pre', { class: 'code', id: 'recording-pending', text: '' });
+    var msg = h('div', { class: 'muted', id: 'recording-message', text: '' });
+    var front = h('button', { id: 'recording-front', class: 'primary', text: 'Bring the recording window to front', onclick: function () { recorderCommand('front'); } });
+    var save = h('button', { id: 'recording-save', text: 'Save', title: 'Write the pending steps into the file (the recording goes on)', onclick: function () { recorderCommand('save').then(poll); } });
+    var finish = h('button', { id: 'recording-finish', text: 'Save & finish', title: 'Write the pending steps and end the recording', onclick: function () { recorderCommand('save_and_finish').then(poll); } });
+    var box = h('section', { id: 'recording-status' }, [
+      h('h2', { text: 'Recording is running in the other window' }),
+      h('p', { class: 'muted', text: 'Every step you take there is written above the magic_test line in:' }),
+      h('div', { class: 'path', id: 'recording-path', text: callSite.path + ':' + callSite.line }),
+      count,
+      h('div', { class: 'actions' }, [front, save, finish]),
+      msg,
+      h('p', { class: 'muted', text: 'Pending code (not yet saved):' }),
+      pending
+    ]);
+    main.appendChild(box);
+    var timer = null;
+    function poll() {
+      return W.api.get('state').then(function (st) {
+        if (!st || st.status === 'idle') return;
+        var n = (st.steps || []).length;
+        count.textContent = n + (n === 1 ? ' step' : ' steps') + ' · ' + (st.saved_count || 0) + ' saved';
+        pending.textContent = (st.pending_code || []).join('\n') || '(nothing pending)';
+        if (st.status === 'finished') {
+          window.clearInterval(timer);
+          setStatus('finished', 'ok');
+          box.querySelector('h2').textContent = 'Recording finished';
+          msg.textContent = 'The steps were written to ' + callSite.path + '. Run the spec to replay it; run bin/magic new again for the next test.';
+          front.disabled = save.disabled = finish.disabled = true;
+        }
+      }).catch(function () { /* the server is between requests */ });
+    }
+    timer = window.setInterval(poll, 700);
+    poll();
   }
 
   return { bind: bind, schedule: schedule, refresh: refresh, render: render, notice: notice };

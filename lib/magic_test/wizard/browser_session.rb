@@ -43,12 +43,13 @@ module MagicTest
           break if %w[recording cancelled].include?(@status)
         end
         raise Wizard::Error, "wizard cancelled" if @status == "cancelled"
-        wizard_window = page.windows.first if page.windows.size > 1
+        # B9: the wizard window stays open as a status screen (file, live step
+        # count, Save / Save & finish, "bring the recording to front"); the
+        # recording runs in the window the preflight opened.
         if @preflight_window
           page.switch_to_window(@preflight_window)
           front!
         end
-        wizard_window&.close if wizard_window && wizard_window != page.current_window
         runner.record(call_site, plan)
       ensure
         self.class.current = nil
@@ -88,7 +89,18 @@ module MagicTest
       end
 
       def state_payload
-        {status: @status, plan: plan&.to_h, preflight: last_preflight&.to_h, call_site: call_site&.to_h, errors: @errors}
+        {status: @status, plan: plan&.to_h, preflight: last_preflight&.to_h, call_site: call_site&.to_h, errors: @errors, recording: recording_payload}
+      end
+
+      # B9: what the status screen shows while the recorder runs (nil before Start).
+      def recording_payload
+        return nil unless @status == "recording"
+        session = MagicTest.session
+        return {status: "starting", steps: 0, saved: 0} unless session
+        steps = session.steps
+        {status: session.status.to_s, steps: steps.size, saved: session.saved_step_count, pending_code: session.pending_lines}
+      rescue => e
+        {status: "unknown", error: e.message}
       end
 
       private
