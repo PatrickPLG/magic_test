@@ -110,4 +110,27 @@ RSpec.describe("Wizard preflight failures", :recorder, type: :system) do
     expect(v.errors.first.message).to(eq("Factory :provider has no trait :with_gold."))
     expect(v.errors.first.fix).to(eq("known traits: :with_cvr, :with_english_company_description, :with_user"))
   end
+
+  # Seen in the Studiz-mirror CI job under load: right after the visit, the
+  # freshly opened window's frame had no JavaScript context yet, Ferrum gave
+  # up after 0.6 s, and preflight reported "Ferrum::NoExecutionContextError:
+  # There's no context available" as a failure of the start page.
+  it "waits for the start page's JavaScript context instead of reporting a visit failure" do
+    armed = 0
+    allow(page.driver).to(receive(:visit).and_wrap_original do |m, *args|
+      result = m.call(*args)
+      armed = 12 # twice Ferrum's own attempts
+      result
+    end)
+    allow_any_instance_of(Ferrum::Frame).to(receive(:execution_id!).and_wrap_original do |m, *args|
+      raise Ferrum::NoExecutionContextError if (armed -= 1) >= 0
+      m.call(*args)
+    end)
+    result = preflight(plan("signed_in" => "provider", "models" => [{"let" => "provider", "factory" => "provider", "traits" => ["with_cvr"]}],
+      "start" => {"route" => "provider_admin_discounts", "params" => {"provider_id" => "provider"}}))
+    expect(result.failures.map(&:message)).to(eq([]))
+    expect(result.status).to(eq(200))
+    expect(result.path).to(start_with("/udbydere/"))
+    expect(result.title).not_to(be_empty)
+  end
 end
