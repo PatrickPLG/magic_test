@@ -10,7 +10,7 @@ RSpec.describe('Backoffice edits the second lead in a table where every row says
 
   it 'backoffice edits the second lead in a table where every row says Rediger' do
     visit(backoffice_leads_path)
-    within('tr', text: 'Bente') do
+    within('tr', text: leads[1].name) do
       click_on(I18n.t('leads.index.edit'))
     end
     select('contacted', from: I18n.t('activerecord.attributes.lead.status'))
