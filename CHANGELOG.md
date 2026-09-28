@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.2.0 (2026-09-28)
+
+Fixes for the wizard's first contact with the real app, then a guided UX.
+
+Bugs found on Studiz (each with a regression test written first):
+
+- B1: the wizard example applies `MagicTest.config.wizard_driven_by` itself
+  when the app registers no default driver (Studiz calls `driven_by :cuprite`
+  per spec; rspec-rails fell back to selenium and `magic_sign_in` crashed
+  with `NoMethodError set_cookie`). `magic_sign_in` now explains a
+  non-Cuprite driver and the line to add.
+- B2: preflight fails only where RSpec would; a record that saved but is
+  invalid afterwards (`create(:provider, :with_cvr)`) is a warning.
+- B3: an existing spec file is never rewritten as a new file; the writer
+  allows exactly one insertion, backs the old file up under
+  `tmp/magic_test/backups/` and refuses anything else; a block that is not in
+  the file is a validation error listing the file's blocks.
+- B4: blocks are picked from the parsed tree (with line numbers) and stored
+  as an exact reference (path, header hash, line); ambiguous descriptions
+  are rejected instead of matching the first hit.
+- B5: trait rows toggle from their label text or the row (the group wrapper
+  was a nested `<label>`), and chosen traits show as removable chips.
+- B6: missing-parent warnings only when a NOT NULL parent is not built by the
+  factory; a parent the factory builds is a collapsed hint; an optional
+  self-referential association (`provider.group_leader`) is never auto-wired;
+  proposed let names never collide.
+- B7: locators refer to the lets: `within("#discount-card-#{discount.id}")`,
+  `click_on(discount.name_da)`, `text: discount.name_da`; text that merely
+  contains factory data gets a REVIEW. Record values are snapshotted when
+  first seen, so a later `reload` does not change earlier locators.
+- B8: DB-change suggestions for any request that changed rows (a rails-ujs
+  remote GET included), by diffing the memoised record against the values
+  the example started with; the SQL parser accepts Postgres shapes
+  (schema-qualified names, query-log comments, CTEs). A Postgres CI job runs
+  the DB-change and golden suites.
+- B9: after Start the wizard window becomes a status screen (file, live step
+  count, bring-to-front, Save / Save & finish) instead of closing.
+
+Guided UX:
+
+- Four steps with the skeleton pinned: What & where (starters, templates,
+  last plan, blank; new or existing file with its block tree), Who & data
+  (learned trait defaults "used in N specs", ranked factory picker,
+  associations, overrides), Start page & extras (routes ranked by the
+  role's visits, human paths, params auto-filled), Review & preflight (what
+  is written where, the insertion highlighted, Save as template).
+- Learned defaults from `spec/**/*.rb` (AST, cached per file mtime in
+  `tmp/magic_test/catalogue_cache.json`): factory usage, trait combinations,
+  sign-in patterns, start pages per role.
+- Starters per Studiz role with their last preflight status
+  (`tmp/magic_test/starters_status.json`); templates in
+  `spec/magic_test/templates/<name>.yml`; `bin/magic new --template <name>
+  "description"`.
+- `?` hints (`config/hints.yml`) in the wizard and the toolbar, including
+  every assertion type, the confidence badges and "Why this locator?".
+- The terminal wizard follows: start from a starter/template/last plan,
+  learned defaults, save as template, `--tui --template`.
+- Fixture app closer to Studiz (CVR-required provider, persisted-but-invalid
+  provider, factory-built NOT NULL parent, optional self-reference, clickable
+  card with a remote-GET action, a factory that omits its NOT NULL parent,
+  nine Studiz-style specs to learn from); `FIXTURE_STUDIZ_MIRROR=1` (no
+  default driver) and `FIXTURE_APP_ADAPTER=postgresql`; CI jobs for both.
+
 ## 1.1.0 (2026-09-25)
 
 The "new system test" wizard: from nothing to a passing spec without

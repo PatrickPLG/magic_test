@@ -122,6 +122,25 @@ without the real app:
    parent shows up as a validation issue. Neither needs a website change,
    but both tell you what the wizard will ask for.
 
+## 1.2: what changed for the wizard on the real app
+
+Nothing to change in the website. Three things to know:
+
+1. The wizard no longer needs a default Capybara driver: its own example
+   applies `MagicTest.config.wizard_driven_by` (`driven_by(:cuprite)`) when no
+   hook did, exactly like Studiz's specs do per file. A spec that calls
+   `magic_sign_in` without Cuprite now fails with the line to add.
+2. On the first `bin/magic new` the wizard parses `spec/**/*.rb` once (a few
+   seconds on Studiz's suite) and caches the result in
+   `tmp/magic_test/catalogue_cache.json`; only changed files are parsed
+   again. Templates you save land in `spec/magic_test/templates/` and are
+   meant to be committed; `tmp/magic_test/backups/` holds a copy of every
+   existing spec the wizard wrote into.
+3. Run the validation checklist from the 1.2 pull request once: the Provider
+   and Institution starters, an append into
+   `spec/system/provider/provider_discounts_page_spec.rb` (the diff must show
+   only the insertion), `--tui`, and `--template`.
+
 ## What to expect on the first run
 
 ```sh

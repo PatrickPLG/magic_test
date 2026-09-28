@@ -89,61 +89,91 @@ The wizard writes the part you would otherwise type by hand (records,
 sign-in, first visit) and drops you into the recorder on that page:
 
 ```sh
-bin/magic new                     # browser wizard in the headed Chrome window
-bin/magic new --tui               # the same questions in the terminal
-bin/magic new --plan plan.yml     # non-interactive: preflight, write, record
+bin/magic new                                 # browser wizard in the headed Chrome window
+bin/magic new --tui                           # the same questions in the terminal
+bin/magic new --template provider_discounts "provider deletes a discount"   # a saved template: straight to review & preflight
+bin/magic new --plan plan.yml                 # non-interactive: preflight, write, record
 bin/magic new spec/system/provider/discounts_spec.rb   # append to a file
 ```
 
-| Form and live preview | Preflight result |
+| Step 1: start from a starter, a template, the last plan or blank | Step 2: who & data, with the traits your specs use pre-ticked |
 | --- | --- |
-| ![The wizard form with the skeleton preview](docs/images/wizard-form.png) | ![Preflight passed, with the start page](docs/images/wizard-preflight.png) |
+| ![Step 1 of the wizard](docs/images/wizard-step1.png) | ![Step 2 of the wizard](docs/images/wizard-form.png) |
 
-![Recording starts on the preflighted page](docs/images/wizard-recording.png)
+| Step 4: review & preflight | While recording: the wizard window is a status screen |
+| --- | --- |
+| ![Preflight passed, with the start page](docs/images/wizard-preflight.png) | ![Recording status screen](docs/images/wizard-recording.png) |
 
-It asks for:
+Four steps, with the spec the wizard will write pinned on the right the
+whole time (`Enter` moves on, `Esc` closes a hint, `Cancel` never touches
+the disk):
 
-1. **A description**, which becomes the `it` name and a leading comment.
-2. **Where the test goes**: a new file (path suggested from the role and
-   the description) or an existing spec. For an existing file the wizard
-   parses its `describe`/`context` blocks, reuses lets whose name, factory
-   and traits match, renames a colliding let from its trait
-   (`archived_discount`) and, when the block lacks the sign-in or the new
-   lets, opens a `context` with its own `before`.
-3. **The signed-in role**: every model with `has_one :user, as: :role`,
-   plus `Institution` (signs in through its leader employee's user), or
-   guest. The role record is a normal `let!`, flagged as signed in.
-4. **Records**: factories with their defined traits, a count
-   (`create_list` above 1), `belongs_to` associations wired to the one let
-   of a matching class (editable: another let, "let the factory build it",
-   or `nil` with a warning when the column is NOT NULL), and attribute
-   overrides validated against the columns and enum values.
-5. **The start page**: the app's named GET routes, the role's namespace
-   first, with the params mapped to lets and the locale (`_en_path` for
-   `/en/...`).
-6. **Extras**: Flipper flags (globally or per actor), `travel_to`, a
-   viewport (desktop 1200×800, tablet, mobile 390×844), cookie consent for
-   guests, `Sidekiq::Testing.inline!` around the steps, an email assertion
-   slot, and fixture files.
+1. **What & where.** Start from a **starter** (one per Studiz role: provider
+   with an active discount, institution leader, student organisation,
+   verified student, admin in the backoffice, guest; each shows when
+   preflight last verified it and is flagged when it failed), a **template**
+   you saved earlier, the **last plan**, or blank. Then the description
+   (becomes the `it` name) and the file: a new one (path suggested from the
+   role and the description) or an existing spec, whose `describe`/`context`
+   tree is shown with line numbers so the example lands in exactly the block
+   you pick, even when names repeat.
+2. **Who & data.** The signed-in role and its traits, with the combination
+   your own specs use most pre-ticked and labelled ("used in 12 specs");
+   records from a search-first list ranked by how often your specs create
+   them (infrastructure factories such as `ahoy_*`, audits, versions and
+   Flipper hidden behind "show all"), each with its traits, count
+   (`create_list`), associations (wired to the one matching let; for a
+   record of the same class the picker offers "reuse provider" or "leave it
+   to the factory") and attribute overrides.
+3. **Start page & extras.** Routes ranked by the pages your specs visit as
+   that role, grouped by namespace with the human path
+   (`/annoncører/:provider_id/admin/rabatter`), params filled from the lets,
+   locale, Flipper flags found in the code (global or per actor), `travel_to`,
+   viewport, Sidekiq inline, mail assertions and fixture files.
+4. **Review & preflight.** The full skeleton, what will be written where
+   (for an existing file only the inserted lines, highlighted; the old file
+   is backed up under `tmp/magic_test/backups/` first and is never
+   replaced), **Save as template**, **Run preflight**, and on success the
+   start page's screenshot, the records and the user, then **Start
+   recording**.
 
-Every change re-validates the plan and shows the skeleton on the right.
-**Preflight** then runs the setup inside the real example (FactoryBot,
+Every `?` opens a one-sentence hint with when to use the thing and a short
+Ruby example (`config/hints.yml` in the gem; the same hints explain every
+assertion type, the confidence badges and "Why this locator?" in the
+recorder toolbar).
+
+**Learned defaults.** On the first run the wizard parses your `spec/**/*.rb`
+with the same AST parser it uses for appending (no regexes): which factories
+and trait combinations `create`/`create_list`/`build` use, which sign-in
+helper goes with which factory, which pages each role visits. That is what
+ranks the pickers and pre-ticks the traits. The result is cached per file
+mtime in `tmp/magic_test/catalogue_cache.json`. When a learned default fails
+preflight the wizard says so ("the most common setup in your specs failed
+here") and suggests the next combination.
+
+**Preflight** runs the setup inside the real example (FactoryBot,
 DatabaseCleaner, Flipper and `travel_to` behave exactly as in the spec),
-checks each record is valid and persisted, resolves the user, signs in and
-visits the start page in a second window. It reports status, final path,
-JS errors and a screenshot, and on failure names the stage and a fix:
+signs in and visits the start page in a second window. It fails only where
+RSpec would: a `create` that raises, a role without a user, a login redirect,
+a 4xx/5xx, a JavaScript error. A record that saved but is invalid afterwards
+(Studiz's `create(:provider, :with_cvr)`) is a yellow warning, not a block:
 
 ```
+preflight passed: 200 /annoncører/1/admin/rabatter (2 record(s), signed in as provider.user (User#1))
+preflight warning at records: let!(:provider) is persisted but would not pass validation if re-saved: Description en Must have english description.
+  (fix: RSpec accepts this (create succeeded); it only matters if the test saves provider again. Traits that mention those attributes: :with_english_company_description)
 preflight failed at sign_in: institution.employees.find_by(...)&.user is nil: Institution has no user to sign in with.
   (fix: add trait :with_user to let!(:institution) (the institution needs a leader employee with a user))
-preflight failed at visit: /institutioner/1/studerende answered 403 Forbidden.
-  (fix: the route param :institution_id points at provider (a Provider); it probably needs a let of class Institution)
 ```
 
 Nothing is written until preflight passes. Then the skeleton is written
-(atomically, syntax-checked) and recording starts in that same window with
-the preflight data still in place. The written spec reproduces the same
-state when it runs on its own later; the golden wizard flows prove it 3/3.
+(atomically, syntax-checked, an existing file only ever gains one insertion)
+and recording starts in the preflight window. The wizard window stays open
+as a status screen: where the recording runs, the file and line, a live
+step count, **Bring the recording window to front**, and **Save** / **Save &
+finish** that act on the recorder. The written spec reproduces the same
+state when it runs on its own; the golden wizard flows prove it 3/3 through
+the browser steps, the terminal and plan files.
 
 A written skeleton looks like this:
 
@@ -167,12 +197,22 @@ RSpec.describe('Provider renames a discount', :js, type: :system) do
 end
 ```
 
-A plan file for `--plan` is the same information as YAML (the wizard saves
-the last one to `tmp/magic_test/last_plan.yml`):
+What the recorder writes from there refers to your lets, never to factory
+data: a card whose id embeds a record id becomes
+`within("#discount-card-#{discount.id}") { … }`, a link whose text is the
+record's name becomes `click_on(discount.name_da)`, and a text that merely
+contains factory data gets a `REVIEW` comment.
+
+Templates live in `spec/magic_test/templates/<name>.yml` (commit them; a
+template keeps records, role and start page, and each test gets its own
+description). A plan file for `--plan` is the same information as YAML (the
+wizard saves the last one to `tmp/magic_test/last_plan.yml`); `target.block`
+is the block reference the tree picker stores (`{path: [...], line:, header:}`),
+or a description path for hand-written plans:
 
 ```yaml
 description: provider renames a discount
-target: { path: spec/system/provider/renames_discount_spec.rb }   # add block: ["Provider discounts"] to append
+target: { path: spec/system/provider/renames_discount_spec.rb }   # block: {path: ["Provider discounts", "index page"], line: 12} to append
 signed_in: provider
 models:
   - { let: provider, factory: provider, traits: [with_cvr] }
@@ -185,16 +225,15 @@ Configuration for the wizard:
 
 ```ruby
 MagicTest.config.user_for_role["Institutions::Library::Library"] = ->(let) { "#{let}.user" }  # role class => user expression
-MagicTest.config.wizard_driven_by = "driven_by(:cuprite)"   # first line of the generated before; nil to omit
+MagicTest.config.wizard_driven_by = "driven_by(:cuprite)"   # applied by the wizard example when the app sets no driver; first line of the generated before
 MagicTest.config.login_paths = %w[/users/sign_in /login]     # a preflight landing here means "not signed in"
 ```
 
 Limits of the wizard: it introspects, it does not read your seeds or
 `default_scope`s, so a factory that needs data the plan does not name shows
 up as a preflight failure rather than being guessed; attribute overrides are
-strings and integers (dates and times as strings); models added through the
-browser's "add let!" button get the default factory without traits; the
-terminal wizard cannot draw the preflight screenshot.
+strings and integers (dates and times as strings); the terminal wizard
+cannot draw the preflight screenshot.
 
 ## The toolbar
 
