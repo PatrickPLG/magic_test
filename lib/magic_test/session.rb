@@ -11,6 +11,8 @@ require "magic_test/call_site"
 require "magic_test/console"
 require "magic_test/scripted_session"
 
+require "magic_test/record_refs"
+
 module MagicTest
   # One recording session: the server-side source of truth for events,
   # requests, generated steps and toolbar commands. `Session.run` blocks the
@@ -105,6 +107,12 @@ module MagicTest
       ids = request_log.record_ids
       ids += memoized.values.select { |v| v.respond_to?(:id) && defined?(ActiveRecord::Base) && v.is_a?(ActiveRecord::Base) }.map { |v| v.id.to_s }
       ids.uniq
+    end
+
+    # B7: let expressions for the memoised records' ids and values, as they
+    # were when each record was first seen (lazy lets join when they appear).
+    def record_refs
+      (@record_refs ||= RecordRefs.new).add(memoized)
     end
 
     # The example's memoised `let` values (name => value), when RSpec is in use.

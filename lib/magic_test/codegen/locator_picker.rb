@@ -1,3 +1,5 @@
+require "magic_test/record_refs"
+
 module MagicTest
   module Codegen
     # Chooses the best verified-unique locator among the candidates the
@@ -8,15 +10,20 @@ module MagicTest
       Choice = Struct.new(:code, :kind, :by, :scope, :confidence, :review, :i18n_key, :literal, :alternatives, :unique)
 
       SEMANTIC_BY_ORDER = %w[label text own_text i18n id name placeholder title value alt].freeze
-      SCOPE_ORDER = %w[modal form row heading ancestor nth].freeze
+      SCOPE_ORDER = %w[modal form record row heading ancestor nth].freeze # record (B7): the card/row wrapper by its let-based id
 
-      def initialize(known_ids:, i18n_index:, i18n_keys: true, template_scopes: [], namespace: nil, i18n_locale: nil)
+      # @param record_refs [RecordRefs] let expressions for the example's
+      #   record ids and values (B7): "#discount-card-42" is emitted as
+      #   "#discount-card-#{discount.id}", a text equal to discount.name_da as
+      #   that expression.
+      def initialize(known_ids:, i18n_index:, i18n_keys: true, template_scopes: [], namespace: nil, i18n_locale: nil, record_refs: nil)
         @known_ids = known_ids
         @i18n = i18n_index
         @i18n_locale = i18n_locale
         @i18n_keys = i18n_keys
         @template_scopes = template_scopes
         @namespace = namespace
+        @refs = record_refs || RecordRefs::EMPTY
       end
 
       # @param candidates [Array<Hash>] from the browser
@@ -43,6 +50,22 @@ module MagicTest
         c["exact"] = c["exact"].to_i
         c["partial"] = c["partial"].to_i
         c["unique"] = unique?(c["exact"], c["partial"], c["exact_supported"] != false)
+        # B7: a value that embeds a record id is kept when the let can stand in for the id.
+        if %w[id name css].include?(c["by"]) && DynamicValues.embeds_known_id?(c["locator"], @known_ids)
+          interpolated = @refs.interpolate_id(c["locator"])
+          c["interpolated"] = interpolated if interpolated && !DynamicValues.dynamic?(interpolated.gsub(/\#\{[^}]*\}/, "x"), [])
+        end
+        if c["scope"].is_a?(Hash) && (expr = @refs.expression_for_value(c["scope"]["text"]))
+          c["scope"] = c["scope"].merge("text_code" => expr)
+        end
+        if c["scope"].is_a?(Hash) && DynamicValues.embeds_known_id?(c["scope"]["css"], @known_ids)
+          interpolated = @refs.interpolate_id(c["scope"]["css"])
+          if interpolated && !DynamicValues.dynamic?(interpolated.gsub(/\#\{[^}]*\}/, "x"), [])
+            c["scope"] = c["scope"].merge("css_code" => "\"#{interpolated.gsub(/(?<!\\)"/, "\\\"")}\"")
+          else
+            c["dynamic_scope"] = true # a wrapper id no let accounts for: not a locator
+          end
+        end
         c
       end
 
@@ -54,6 +77,8 @@ module MagicTest
       end
 
       def dynamic?(c)
+        return true if c["dynamic_scope"]
+        return false if c["interpolated"]
         val = c["locator"].to_s
         case c["by"]
         when "id", "name", "css" then DynamicValues.dynamic?(val, @known_ids)
@@ -78,10 +103,20 @@ module MagicTest
       # The browser emits CSS candidates in preference order (id, name, data
       # attributes, href, class combinations, single classes); keep that order,
       # prefer global over scoped and selector-only over selector+text.
+      # Scoped ones rank by scope kind (SCOPE_ORDER: the record wrapper before a heading's text, B7).
       def pick_css(css)
-        c = css.each_with_index.select { |x, _i| x["unique"] }.min_by { |x, i| [x["scope"] ? 1 : 0, x["text"].present? ? 1 : 0, i] }&.first
+        c = css.each_with_index.select { |x, _i| x["unique"] }.min_by { |x, i| [x["scope"] ? 1 : 0, x["text"].present? ? 1 : 0, scope_rank(x), i] }&.first
         return nil unless c
-        Choice.new(code: css_code(c), kind: "css", by: "css", scope: c["scope"], confidence: :amber, review: nil, unique: true)
+        Choice.new(code: css_code(c), kind: "css", by: "css", scope: c["scope"], confidence: :amber, review: factory_data_review(c["text"]), unique: true)
+      end
+
+      # B7: a text that is more than one record value (a card's name plus its
+      # description) is brittle; say which lets it contains.
+      def factory_data_review(text)
+        return nil if text.blank? || @refs.expression_for_value(text)
+        contained = @refs.values_contained_in(text)
+        return nil if contained.empty?
+        "the text contains factory data (#{contained.join(", ")}); prefer a stable id or data attribute on the element"
       end
 
       def pick_positional(usable)
@@ -105,12 +140,21 @@ module MagicTest
         SEMANTIC_BY_ORDER.index(c["by"].to_s) || 50
       end
 
+      def scope_rank(c)
+        c["scope"] ? (SCOPE_ORDER.index(c.dig("scope", "kind").to_s) || 99) : 0
+      end
+
       def build(c, confidence, i18n)
         key = nil
         literal = c["locator"]
-        code = RubyLiteral.string(literal)
+        code = locator_code(c)
         review = nil
-        if %w[text own_text label title value alt].include?(c["by"]) && @i18n && @i18n_keys && i18n
+        record_value = %w[text own_text label title value alt].include?(c["by"]) ? @refs.expression_for_value(literal) : nil
+        if record_value
+          code = record_value # B7: click_on(discount.name_da), never the factory's literal
+        elsif %w[text own_text label title value alt].include?(c["by"]) && (review = factory_data_review(literal))
+          confidence = :amber if confidence == :green
+        elsif %w[text own_text label title value alt].include?(c["by"]) && @i18n && @i18n_keys && i18n
           best, matches = @i18n.best(literal, scopes: @template_scopes, namespace: @namespace)
           if best
             key = best.key
@@ -129,9 +173,19 @@ module MagicTest
       end
 
       def css_code(c)
-        parts = [RubyLiteral.string(c["locator"])]
-        parts << "text: #{RubyLiteral.string(c["text"])}" if c["text"].present?
+        parts = [locator_code(c)]
+        parts << "text: #{text_code(c["text"])}" if c["text"].present?
         parts.join(", ")
+      end
+
+      # The locator as Ruby: a literal, or a double-quoted interpolation of the let (B7).
+      def locator_code(c)
+        return RubyLiteral.string(c["locator"]) unless c["interpolated"]
+        "\"#{c["interpolated"].gsub(/(?<!\\)"/, "\\\"")}\""
+      end
+
+      def text_code(text)
+        @refs.expression_for_value(text) || RubyLiteral.string(text)
       end
 
       def alternatives_for(usable, kinds, i18n)

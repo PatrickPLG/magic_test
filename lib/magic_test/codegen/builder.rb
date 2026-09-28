@@ -104,7 +104,8 @@ module MagicTest
         index, locale = i18n_for(event)
         LocatorPicker.new(known_ids: @session.known_ids, i18n_index: index, i18n_locale: locale,
           i18n_keys: @session.i18n_keys?, template_scopes: scopes,
-          namespace: scopes.first&.split(".")&.first)
+          namespace: scopes.first&.split(".")&.first,
+          record_refs: (@session.respond_to?(:record_refs) ? @session.record_refs : nil))
       end
 
       def override_for(event_ids)
@@ -146,8 +147,8 @@ module MagicTest
             index = s["index"].to_i
             chain << Scope.new(kind: :within, open: "within(all(#{RubyLiteral.string(s["css"])}, minimum: #{index + 1})[#{index}]) do", key: "within:#{s["css"]}[#{index}]")
           else
-            args = [RubyLiteral.string(s["css"])]
-            args << "text: #{RubyLiteral.string(s["text"])}" if s["text"].present?
+            args = [s["css_code"] || RubyLiteral.string(s["css"])]
+            args << "text: #{s["text_code"] || RubyLiteral.string(s["text"])}" if s["text"].present?
             chain << Scope.new(kind: :within, open: "within(#{args.join(", ")}) do", key: "within:#{s["css"]}:#{s["text"]}")
           end
         end
@@ -292,7 +293,12 @@ module MagicTest
         param_key = klass.model_name.param_key
         attrs = record.params && (record.params[param_key] || record.params[param_key.to_s])
         return unless attrs.is_a?(Hash)
-        var, rec = @session.memoized.find { |_n, v| v.is_a?(klass) && (record.record_ids || []).include?(v.id.to_s) }
+        # The record in the request path first (PATCH /udbydere/1/admin/rabatter/2: the
+        # member id is the last one, the earlier ones belong to parents); ids in
+        # the params are weaker evidence; a lone let of the class is the last resort.
+        path_ids = record.respond_to?(:path) ? record.path.to_s.scan(%r{/(\d+)(?=/|\z)}).flatten.reverse : []
+        seen = @session.memoized.select { |_n, v| v.is_a?(klass) && (record.record_ids || []).include?(v.id.to_s) }
+        var, rec = path_ids.lazy.map { |id| seen.find { |_n, v| v.id.to_s == id } }.find(&:itself) || ((seen.size == 1) ? seen.first : nil)
         if var.nil?
           # Singular resources (`/profil`) carry no id: the only let of that class is the record.
           same_class = @session.memoized.select { |_n, v| v.is_a?(klass) }

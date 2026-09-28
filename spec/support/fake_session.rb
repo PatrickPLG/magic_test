@@ -27,6 +27,10 @@ class FakeSession
     @route_resolver ||= MagicTest::RouteResolver.new
   end
 
+  def record_refs
+    (@record_refs ||= MagicTest::RecordRefs.new).add(memoized)
+  end
+
   def fixture_file_exists?(relative)
     @fixture_files.include?(relative)
   end

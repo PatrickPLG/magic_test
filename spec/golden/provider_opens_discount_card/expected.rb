@@ -11,7 +11,9 @@ RSpec.describe('Provider opens a discount card and renames it', :js, type: :syst
 
   it 'provider opens a discount card and renames it' do
     visit(provider_admin_discounts_path(provider))
-    find("#discount-card-#{discount.id}").click
+    within("#discount-card-#{discount.id}") do
+      find('div.card-body').click
+    end
     within('#full-view-modal') do
       click_on(discount.name_da)
     end

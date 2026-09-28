@@ -78,7 +78,7 @@ RSpec.describe(MagicTest::Codegen::LocatorPicker) do
         cand(kind: "css", by: "id", locator: "#discount-card-42"),
         cand(kind: "css", by: "classes", locator: ".card.deal", text: "Kaffe 10% Beskrivelse af rabat")
       ], kinds: [])
-      expect(choice.code).to(eq('"#discount-card-#{discount.id}"'))
+      expect(choice.code).to(eq("\"#discount-card-\#{discount.id}\""))
       expect(choice.confidence).to(eq(:amber))
       expect(choice.review).to(be_nil)
     end
@@ -106,6 +106,27 @@ RSpec.describe(MagicTest::Codegen::LocatorPicker) do
         cand(kind: "link_or_button", by: "text", locator: "Rediger", exact: 1, partial: 1, scope: {"kind" => "row", "css" => ".deal", "text" => "Kaffe 10%"})
       ], kinds: %w[link_or_button])
       expect(scoped.scope).to(eq({"kind" => "row", "css" => ".deal", "text" => "Kaffe 10%", "text_code" => "discount.name_da"}))
+    end
+
+    it "keeps the value a record had when first seen, even after the recorder reloads it with a new value" do
+      refs = MagicTest::RecordRefs.new({"discount" => discount})
+      discount.name_da = "Kaffe 25%" # what `discount.reload` does after the rename step
+      refs.add({"discount" => discount, "provider" => provider})
+      expect(refs.expression_for_value("Kaffe 10%")).to(eq("discount.name_da"))
+      expect(refs.expression_for_value("Kaffe 25%")).to(be_nil)
+      expect(refs.expression_for_value("Café Vivaldi 3")).to(eq("provider.name"))
+    end
+
+    it "prefers the record wrapper (an ancestor id embedding the record id) and writes it through the let" do
+      choice = picker.pick([
+        cand(kind: "css", by: "classes", locator: "div.card-body", exact: 2, partial: 2),
+        cand(kind: "css", by: "classes", locator: "div.card-body", exact: 1, partial: 1, scope: {"kind" => "heading", "css" => "div.card.deal", "text" => "Kaffe 10%"}),
+        cand(kind: "css", by: "classes", locator: "div.card-body", exact: 1, partial: 1, scope: {"kind" => "record", "css" => "#discount-card-42"})
+      ], kinds: [])
+      expect(choice.scope).to(eq({"kind" => "record", "css" => "#discount-card-42", "css_code" => "\"#discount-card-\#{discount.id}\""}))
+      seen_in_requests = described_class.new(known_ids: %w[42 7 99], i18n_index: index, record_refs: refs) # 99 was in a request, but no let has it
+      dropped = seen_in_requests.pick([cand(kind: "css", by: "classes", locator: "div.card-body", exact: 1, partial: 1, scope: {"kind" => "record", "css" => "#row-99"})], kinds: [])
+      expect(dropped.unique).to(be(false)) # the wrapper is dynamic, not a locator
     end
 
     it "flags text that merely contains factory data when nothing stabler is available" do

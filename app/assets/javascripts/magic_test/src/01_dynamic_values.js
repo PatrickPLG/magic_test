@@ -87,6 +87,14 @@ MT.dynamic = (function () {
     return id;
   }
 
+  // B7: an id such as `discount-card-42` is stable apart from the record id it
+  // embeds; Ruby rewrites the number as the let ("#discount-card-#{discount.id}").
+  function recordId(el) {
+    var id = el && el.id;
+    if (!id || !embedsKnownId(id)) return null;
+    return isDynamic(id, []) || CHOSEN_CONTAINER.test(id) ? null : id;
+  }
+
   function stableName(node) {
     var name = node && node.name;
     if (!name) return null;
@@ -99,5 +107,5 @@ MT.dynamic = (function () {
     return String(href).replace(/[?#].*$/, '').replace(/\/\d+(?=\/|$)/g, '/*');
   }
 
-  return { isDynamic: isDynamic, isBootstrapUtility: isBootstrapUtility, semanticClasses: semanticClasses, stableId: stableId, stableName: stableName, hrefPattern: hrefPattern, embedsKnownId: embedsKnownId };
+  return { isDynamic: isDynamic, isBootstrapUtility: isBootstrapUtility, semanticClasses: semanticClasses, stableId: stableId, stableName: stableName, hrefPattern: hrefPattern, embedsKnownId: embedsKnownId, recordId: recordId };
 })();
